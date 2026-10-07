@@ -1,0 +1,10 @@
+@import 'tailwindcss';
+
+/* Design tokens - extend here instead of using arbitrary values in JSX */
+@theme {
+  --color-brand-50: oklch(0.97 0.02 250);
+  --color-brand-500: oklch(0.55 0.18 250);
+  --color-brand-600: oklch(0.48 0.18 250);
+  --color-brand-700: oklch(0.42 0.17 250);
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}

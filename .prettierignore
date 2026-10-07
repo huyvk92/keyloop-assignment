@@ -1,0 +1,8 @@
+dist
+coverage
+storybook-static
+public/mockServiceWorker.js
+package-lock.json
+
+# AI instructions (agents/skills) - verified reference code must stay byte-identical
+.claude
