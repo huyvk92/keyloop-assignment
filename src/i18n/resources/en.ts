@@ -51,6 +51,9 @@ export const en = {
     },
   },
   dealerships: {
+    selector: {
+      label: 'Dealership',
+    },
     loadingOne: 'Loading dealership…',
     loadingList: 'Loading dealerships…',
     loadErrorOne: "Couldn't load dealership",

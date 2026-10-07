@@ -879,6 +879,13 @@ hard-coded UI strings.
   - Files: `src/components/LanguageSwitcher.tsx` (+test, +story), `src/app/Layout.tsx`, `src/pages/DashboardPage.test.tsx`
   - Test plan: has an accessible name; options "English" (`lang="en"`) and "Tiếng Việt" (`lang="vi"`); is keyboard operable; switching to vi translates the page without a reload, sets `<html lang="vi">` and stores the choice; URL search params and the dealership are unchanged; reloading (re-render with stored `vi`) opens in Vietnamese.
 
+**Pulled forward (stakeholder request, after Phase 1b):** T-017 (form primitives) and T-033
+(DealershipSelector) were done early, so dealerships can be switched from a dropdown instead of
+by editing the URL. Choosing a dealership pushes `/dealerships/:id` with no search params (TA-10).
+Focus stays on the select; navigation state `keepFocus` tells the page heading not to move focus.
+Back/Forward and links still move focus to the h1. KPI and aging requests in T-033's test plan
+will be asserted once T-023/T-024 exist.
+
 ### Phase 2 - Filters, sort & facets (US-002, API side of US-011)
 
 - [ ] **T-013** Contract: full filter fields, age-range refine, facets response · layer: shared · S · depends-on: T-001 · covers: AC-002.3, AC-002.4, AC-002.6, BR-06, BR-07, BR-08
@@ -899,7 +906,7 @@ hard-coded UI strings.
 - [ ] **T-016** `GET /api/dealerships/:id/facets` · layer: api · S · depends-on: T-005, T-013 · covers: AC-002.2, BR-06
   - Files: `inventory.repository.ts`, `inventory.service.ts`, `inventory.routes.ts`, `inventory.routes.test.ts`
   - Test plan: makes and models are sorted and distinct; scoped to the dealership (no other dealership's makes); an empty dealership gives `makes: []`; unknown id gives 404.
-- [ ] **T-017** Form primitives: Field (label/hint/error wiring), TextInput, Select, Checkbox · layer: web · S · depends-on: - · covers: NFR-01, AC-006.4
+- [x] **T-017** Form primitives: Field (label/hint/error wiring), TextInput, Select, Checkbox · layer: web · S · depends-on: - · covers: NFR-01, AC-006.4
   - Files: `src/components/{Field,TextInput,Select,Checkbox}.tsx` + tests + stories
   - Test plan: `getByLabelText` works; an error sets `aria-invalid` and `aria-describedby` to the error id; the error text is visible; stories show 0 a11y violations.
 - [ ] **T-018** `useInventorySearchParams` hook (URL to typed query, setters, BR-06 clearing) · layer: web · M · depends-on: T-010, T-013 · covers: AC-002.2, AC-002.7, AC-002.8, AC-011.3, BR-06
@@ -960,7 +967,7 @@ hard-coded UI strings.
 
 ### Phase 5 - Should stories (US-008..US-012, US-011 UI)
 
-- [ ] **T-033** DealershipSelector (switch resets filters; URL keeps selection) · layer: web · S · depends-on: T-010, T-017 · covers: AC-008.1, AC-008.2, AC-008.3, BR-04
+- [x] **T-033** DealershipSelector (switch resets filters; URL keeps selection) · layer: web · S · depends-on: T-010, T-017 · covers: AC-008.1, AC-008.2, AC-008.3, BR-04
   - Files: `src/features/dealerships/components/DealershipSelector.tsx` (+test, +story), `DashboardPage.tsx`
   - Test plan: lists all dealerships A-Z with the current one selected; choosing Leeds navigates to `/dealerships/2` with no search params; KPIs, aging, and list requests use id 2.
 - [ ] **T-034** RefreshControl ("Last updated", manual Refresh) + 60 s polling config · layer: web · M · depends-on: T-023, T-024, T-032 · covers: AC-009.1, AC-009.2, AC-009.3, NFR-05

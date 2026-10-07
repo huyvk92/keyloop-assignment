@@ -1,11 +1,12 @@
 import { DealershipParamsSchema } from '@shared/api/dealerships';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams } from 'react-router';
+import { Link, useLocation, useParams } from 'react-router';
 import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { PageSection } from '@/components/PageSection';
-import { useDealership } from '@/features/dealerships';
+import { DealershipSelector, useDealership } from '@/features/dealerships';
 import { VehicleTable } from '@/features/inventory';
+import { shouldKeepFocus } from '@/lib/navigation-focus';
 
 /** `/dealerships/:dealershipId`: the dealership comes from the path (ADR-008, AC-008.3). */
 export function DashboardPage() {
@@ -13,6 +14,8 @@ export function DashboardPage() {
   const parsed = DealershipParamsSchema.safeParse(useParams());
   const dealershipId = parsed.success ? parsed.data.dealershipId : undefined;
   const { data: dealership, error, isPending, isError, refetch } = useDealership(dealershipId);
+  // A switch from the selector keeps focus on the select; Back/links still focus the h1.
+  const keepFocus = shouldKeepFocus(useLocation().state);
 
   if (isPending) {
     return (
@@ -46,7 +49,11 @@ export function DashboardPage() {
     );
   }
   return (
-    <PageSection title={dealership.name}>
+    <PageSection
+      title={dealership.name}
+      focusHeadingOnChange={!keepFocus}
+      actions={<DealershipSelector dealershipId={dealership.id} />}
+    >
       <VehicleTable dealership={dealership} />
     </PageSection>
   );

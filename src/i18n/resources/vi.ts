@@ -51,6 +51,9 @@ export const vi = {
     },
   },
   dealerships: {
+    selector: {
+      label: 'Đại lý',
+    },
     loadingOne: 'Đang tải đại lý…',
     loadingList: 'Đang tải danh sách đại lý…',
     loadErrorOne: 'Không thể tải đại lý',

@@ -232,3 +232,41 @@ Scaffold (`/init-react-app`) -> TDD implementation (`/implement-trd`) -> Review 
   became "Chạy khuyến mãi"; "Mã kho" (reads as "warehouse code") became "Mã tồn kho".
 - **Open**: The copy is reviewed by me, not by a native-speaker product owner. The bundle grew
   to 130 kB gzip for the main chunk, and the ADR's 10-15 kB estimate was not measured separately.
+
+### 2026-10-07 · dealership dropdown (T-017 + T-033 pulled forward)
+
+- **Trigger**: The stakeholder asked for a dropdown to select the dealership instead of changing
+  the URL. This is US-008 / T-033, planned for Phase 5. I pulled it forward together with its
+  dependency T-017 (form primitives, which Phase 2 needs anyway) and recorded that in the TRD.
+- **Direction given**: Push navigation with filters reset (TA-10). The URL stays the only place
+  the selection lives (AC-008.3). No previous-dealership rows may show (BR-04). Keyboard focus
+  must stay on the select. Labels in EN and VI.
+- **AI output**: `react-frontend-developer` built Field, TextInput, Select, Checkbox, and
+  DealershipSelector, and refactored LanguageSwitcher onto Field/Select. It added an opt-out from
+  the heading focus for selector navigation (`keepFocus` history state, validated with Zod).
+- **Validation (mine)**:
+  - `npm run validate` passed: web 229 tests, API 107.
+  - Real Chrome via puppeteer-core against the real API:
+    - The dropdown lists 4 dealerships A-Z.
+    - Leeds goes to `/dealerships/2` (page param reset), with Leeds rows only ("1-25 of 220")
+      and focus kept on the select.
+    - York shows the empty state.
+    - Back twice restores Birmingham `?page=2` with focus on the h1, and a reload keeps the
+      selection.
+  - axe-core 4.14 (WCAG 2.0 A/AA + 2.1 AA) on the live page reported 0 violations in English and
+    in Vietnamese. This closes the "a11y not checked in a browser" gap the agent reported.
+- **Human decision**: Accepted. The added focus mechanism is justified by the keyboard
+  requirement, and the extra `src/lib` helpers keep component files exporting only components.
+
+### 2026-10-07 · kept the scaffold UI store (user decision)
+
+- **Trigger**: The user asked why `useUiStore.isSidebarOpen` was never used.
+- **Finding**: `src/stores/ui-store.ts` was example code from the `/init-react-app` scaffold. It
+  demonstrated the Zustand pattern. Only `src/test/setup.ts` referenced it, and no PRD or TRD
+  requirement needs a sidebar.
+- **Options I gave**: Remove it as dead code (my recommendation), or keep it. Adding a sidebar
+  was explicitly ruled out by the user.
+- **Human decision**: Keep the store as-is. I briefly removed it, then restored it from `HEAD`
+  when the user asked to keep it. No sidebar UI is added, so `isSidebarOpen` stays unused until a
+  requirement needs it. It remains the reference Zustand example until T-037 adds the first
+  feature store.

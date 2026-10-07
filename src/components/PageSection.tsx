@@ -7,14 +7,16 @@ type Props = {
   title: string;
   /** Optional content next to the heading (e.g. a selector or refresh control). */
   actions?: ReactNode;
+  /** Move focus to the `<h1>` when the title changes (default true); see `usePageHeading`. */
+  focusHeadingOnChange?: boolean;
   className?: string;
   children?: ReactNode;
 };
 
 /** Route-level page wrapper: labelled section, `<h1>` that receives focus on navigation. */
-export function PageSection({ title, actions, className, children }: Props) {
+export function PageSection({ title, actions, focusHeadingOnChange, className, children }: Props) {
   const headingId = useId();
-  const headingRef = usePageHeading(title);
+  const headingRef = usePageHeading(title, { moveFocus: focusHeadingOnChange });
   return (
     <section aria-labelledby={headingId} className={cn('space-y-6', className)}>
       <div className="flex flex-wrap items-center justify-between gap-4">
