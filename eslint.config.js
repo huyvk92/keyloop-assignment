@@ -11,7 +11,13 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig([
-  globalIgnores(['dist', 'coverage', 'storybook-static', 'public/mockServiceWorker.js']),
+  globalIgnores([
+    'dist',
+    'coverage',
+    'server/coverage',
+    'storybook-static',
+    'public/mockServiceWorker.js',
+  ]),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -48,6 +54,29 @@ export default defineConfig([
   {
     files: ['src/**/*.test.{ts,tsx}'],
     extends: [testingLibrary.configs['flat/react']],
+  },
+  {
+    // API (Node): relative imports are idiomatic; never import web code
+    files: ['server/**/*.ts'],
+    languageOptions: { globals: globals.node },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [{ group: ['@/*'], message: 'The API must not import web app code (src/).' }] },
+      ],
+    },
+  },
+  {
+    // Shared API contract: only Zod schemas/types, no web or API code
+    files: ['shared/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [{ group: ['@/*', '../*'], message: 'shared/ may only depend on zod.' }],
+        },
+      ],
+    },
   },
   {
     files: ['src/test/**', 'src/**/*.stories.tsx', '.storybook/**'],

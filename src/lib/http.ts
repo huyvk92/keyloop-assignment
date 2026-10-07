@@ -1,8 +1,11 @@
+import { ApiErrorSchema } from '@shared/api/common';
 import type { ZodType } from 'zod';
 import { env } from '@/lib/env';
 
 export class HttpError extends Error {
   readonly status: number;
+  /** Machine-readable code from the API error body (e.g. VALIDATION_ERROR), if present. */
+  readonly code: string | undefined;
   readonly body: unknown;
 
   constructor(status: number, message: string, body?: unknown) {
@@ -10,6 +13,7 @@ export class HttpError extends Error {
     this.name = 'HttpError';
     this.status = status;
     this.body = body;
+    this.code = ApiErrorSchema.safeParse(body).data?.error.code;
   }
 }
 

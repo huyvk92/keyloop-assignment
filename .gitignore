@@ -32,3 +32,8 @@ storybook-static
 !.vscode/settings.json
 
 *storybook.log
+
+# API
+server/.env
+server/data
+server/coverage

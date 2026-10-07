@@ -35,6 +35,10 @@ flowchart LR
 
 ### 3.1 Folder structure
 ```
+shared/api/       # Zod API contract used by web and API
+server/src/
+  app.ts  server.ts  config.ts  lib/  plugins/  db/
+  modules/<feature>/{routes,service,repository,seed}.ts + tests
 src/
   app/            # providers, router, layout
   features/<name>/{components,hooks,api,types.ts,index.ts}
@@ -51,11 +55,26 @@ src/
 | ---- | ---- | ------- |
 
 ## 4. Data models & API contracts
+### 4.1 Shared contract (`shared/api/*.ts`)
 ```ts
-// Zod schema + inferred type per entity
+// Zod schema + inferred type per entity, request and response
 ```
-| Method | Endpoint | Request | Response | Errors |
-| ------ | -------- | ------- | -------- | ------ |
+
+### 4.2 REST endpoints
+| Method | Endpoint | Request (params/query/body) | Response | Errors (status · code) | Stories / BRs |
+| ------ | -------- | --------------------------- | -------- | ---------------------- | ------------- |
+
+### 4.3 Database schema (SQLite)
+```sql
+-- STRICT tables, NOT NULL, CHECK constraints, foreign keys, indexes for filters/sorts
+```
+
+### 4.4 Business rules by layer
+| BR | Enforced in API (service) | Mirrored in web (UX) | Test |
+| -- | ------------------------- | -------------------- | ---- |
+
+### 4.5 Seed data
+<Dealerships, vehicle mix, ages relative to "today" that cover every bucket and boundary.>
 
 ## 5. State management
 <Server state (TanStack Query): query keys, invalidation rules.
@@ -86,7 +105,7 @@ Local state: what stays in useState.>
 
 ## 10. Implementation plan
 ### Phase 1 - Foundation & vertical slice
-- [ ] **T-001** <title> · S · depends-on: - · covers: AC-001.1
+- [ ] **T-001** <title> · layer: api · S · depends-on: - · covers: AC-001.1
   - Files: 
   - Test plan: 
 

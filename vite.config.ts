@@ -7,7 +7,14 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
-    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@shared': fileURLToPath(new URL('./shared', import.meta.url)),
+    },
+  },
+  server: {
+    // Forward API calls to the backend (server/) during development
+    proxy: { '/api': 'http://127.0.0.1:3001' },
   },
   test: {
     environment: 'jsdom',

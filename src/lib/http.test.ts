@@ -25,7 +25,23 @@ describe('fetchJson', () => {
     await expect(fetchJson(apiUrl('/items/1'), ItemSchema)).rejects.toMatchObject({
       name: 'HttpError',
       status: 404,
+      code: undefined,
     } satisfies Partial<HttpError>);
+  });
+
+  it('exposes the API error code from a standard error body', async () => {
+    server.use(
+      http.post(apiUrl('/items'), () =>
+        HttpResponse.json(
+          { error: { code: 'VALIDATION_ERROR', message: 'Request validation failed' } },
+          { status: 400 },
+        ),
+      ),
+    );
+
+    await expect(
+      fetchJson(apiUrl('/items'), ItemSchema, { method: 'POST', body: '{}' }),
+    ).rejects.toMatchObject({ status: 400, code: 'VALIDATION_ERROR' } satisfies Partial<HttpError>);
   });
 
   it('rejects when the response does not match the schema', async () => {

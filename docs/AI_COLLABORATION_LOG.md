@@ -83,3 +83,28 @@ Scaffold (`/init-react-app`) -> TDD implementation (`/implement-trd`) -> Review 
 - **Corrections**: (1) BR-18 (server-side validation) had no AC for BR-12. Added a
   service-level rejection of an empty "Logged by" to AC-006.4 and to the traceability table.
   (2) AC-001.7 silently assumed GBP; made it explicit in A-13.
+
+### 2026-10-07 · init-node-api (backend tooling + scaffold)
+
+- **Goal**: Add a Node.js backend (the user's decision during `/create-prd`), with skills and an
+  agent so backend TRD tasks can be delegated and verified like frontend ones.
+- **Agent/skill**: Claude Code (main session). Created `node-api-best-practices`,
+  `init-node-api` (with a verified `reference.md`), and the `node-backend-developer` agent.
+  Updated `create-trd`, `implement-trd` (routing by task layer), `review-code`, and 4 agents.
+- **Decisions**: Fastify 5 + Zod type provider (reuses the web app's Zod for one shared contract
+  in `shared/`); SQLite via `better-sqlite3` (durable, zero-ops; the prebuilt binary was verified
+  to install without Xcode CLT); npm workspace `server/`; Vite proxy `/api` → :3001; an injected
+  `Clock` with `APP_TODAY` so the date rules (BR-01/02) are deterministic (NFR-10).
+- **Validation**: Built and tested in a throwaway copy first, then applied to the repo. Root
+  `npm run validate` passed (web 16 tests, API 17 tests at 98.8% statements); web and Storybook
+  builds passed; the real `npm run dev` smoke test passed (health directly and through the proxy,
+  404 error shape, Swagger 200, SQLite file created).
+- **Human decision**: Modified.
+- **Corrections**:
+  - Fastify 5 types the error handler's `error` as `unknown`, so it is now narrowed safely.
+  - `npm install -w server` did not record deps before the workspace was installed, and the
+    result left a broken vitest; fixed with a clean install (documented in the skill).
+  - Added a test for file-DB reopen, the mechanism behind AC-007.3 (persistence across restart).
+  - My first smoke test treated the proxy's 500 during API startup as "ready"; the skill now
+    waits for HTTP 200.
+  - Rejected `node:sqlite`, which is still experimental on Node 24.2.

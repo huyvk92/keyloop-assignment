@@ -12,7 +12,11 @@ This repo contains custom Claude Code **agents** (`.claude/agents/`) and **skill
                          (anytime: /create-component, /log-ai-decision)
 ```
 
-The stack and conventions are in [`react-best-practices`](.claude/skills/react-best-practices/SKILL.md):
+The repo has a React web app at the root, a Node.js API in `server/` (npm workspace), and a shared
+Zod API contract in `shared/`. The API stack and conventions are in
+[`node-api-best-practices`](.claude/skills/node-api-best-practices/SKILL.md): Fastify 5, Zod,
+SQLite (better-sqlite3), and Swagger. The web stack and conventions are in
+[`react-best-practices`](.claude/skills/react-best-practices/SKILL.md):
 React 19, TypeScript strict, Vite, Tailwind CSS v4, React Router, TanStack Query, Zustand,
 React Hook Form + Zod, Vitest + Testing Library + MSW, Storybook 10, ESLint, Prettier, husky,
 lint-staged, commitlint, and GitHub Actions CI.
@@ -31,8 +35,8 @@ Requires Node ≥ 20 (see `.nvmrc`) and git ≥ 2.27.
 
 ```bash
 npm install
-cp .env.example .env      # VITE_USE_MOCKS=true runs without a backend (MSW)
-npm run dev               # http://localhost:5173
+cp .env.example .env && cp server/.env.example server/.env
+npm run dev               # web http://localhost:5173 + API http://127.0.0.1:3001 (Swagger: /api/docs)
 npm run storybook         # http://localhost:6006
-npm run validate          # typecheck + lint + format + tests with coverage
+npm run validate          # web + API: typecheck, lint, format, tests with coverage
 ```

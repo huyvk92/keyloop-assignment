@@ -1,6 +1,6 @@
 ---
 name: review-code
-description: Run the quality gate and a structured code review (correctness, security, accessibility, tests, AI-generated code smells) against PRD/TRD. Use after a phase is implemented or before submitting the assignment.
+description: Run the quality gate and a structured code review of web and API code (correctness, security, accessibility, API contract consistency, tests, AI-generated code smells) against PRD/TRD. Use after a phase is implemented or before submitting the assignment.
 argument-hint: [path | feature | "all"]
 ---
 
