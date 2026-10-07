@@ -108,3 +108,35 @@ Scaffold (`/init-react-app`) -> TDD implementation (`/implement-trd`) -> Review 
   - My first smoke test treated the proxy's 500 during API startup as "ready"; the skill now
     waits for HTTP 200.
   - Rejected `node:sqlite`, which is still experimental on Node 24.2.
+
+### 2026-10-07 · create-trd
+
+- **Goal**: Turn PRD v0.1 into a TRD covering the web app, the API, the shared contract, and the DB schema.
+- **Agent/skill**: `/create-trd` → `tech-lead-architect` subagent (preloaded with both best-practice skills).
+- **Direction given**: Server-side computation of age, aging, KPIs, filtering, and paging
+  (NFR-02); age by dealership-local calendar dates translated into `stock_in_date` ranges;
+  append-only actions with the latest row as the current action; a suggested endpoint list; a
+  shared Zod contract also used for URL state; a deterministic seed with exact 90/91-day
+  boundaries; and phase 1 as a runnable vertical slice.
+- **AI output**: `docs/TRD.md` with 8 ADRs, 23 technical assumptions, 6 endpoints, a SQLite
+  schema with CHECKs, indexes, and append-only triggers, and 44 tasks (41 core + 3 optional)
+  in 6 phases, tagged by layer (shared 4, api 13, web 23, full 4). The architect deviated from
+  my direction in three places, each justified: dealership in the URL path (ADR-008), a fourth
+  dealership with 0 vehicles for the empty states, and an aging section capped at 10 with
+  "View all".
+- **Validation**:
+  - A script parsed all 44 tasks: every one has a valid layer; there are no unknown or forward
+    dependencies and no cycles; web tasks that call endpoints all depend on the API task.
+  - All 55 PRD ACs (42 Must) and all 18 BRs are referenced in the TRD.
+  - Manual review of the contract, endpoints, and SQL: the aging cutoff is `<= today-91`; the
+    VIN in AC-002.6 has 17 characters; a blank `loggedBy` is a 400 (BR-12/BR-18).
+- **Human decision**: Modified.
+- **Corrections**:
+  1. The quality gate in §10 was outdated (it omitted format and coverage), so it now says
+     `npm run validate`, plus the builds at the end of each phase.
+  2. The Mermaid dependency graph omitted dependencies, so it is now labelled as simplified,
+     with `depends-on` as the authoritative source.
+  3. The architect found two contradictions inside the PRD. I fixed them in the PRD itself
+     (v0.2) instead of leaving them only as TAs: A-14 vs NFR-05 (refresh every 60 s) and BR-06
+     "make(s)" (single selection).
+  4. The TRD template still said React 18, so it now says 19.
