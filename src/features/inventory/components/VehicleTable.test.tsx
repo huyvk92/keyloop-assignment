@@ -1,6 +1,7 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import { delay, http, HttpResponse } from 'msw';
 import { VehicleTable } from '@/features/inventory';
+import { i18n } from '@/i18n';
 import { apiUrl } from '@/lib/http';
 import {
   buildCurrentAction,
@@ -198,5 +199,110 @@ describe('VehicleTable', () => {
 
     expect(await screen.findByRole('table')).toBeVisible();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  describe('in Vietnamese (US-015)', () => {
+    beforeEach(async () => {
+      await i18n.changeLanguage('vi');
+    });
+
+    it('translates UI text and formats, keeps vehicle data as stored (AC-015.4, AC-015.5)', async () => {
+      const withAction = buildVehicle({
+        id: 1,
+        stockNumber: 'STK-0001',
+        make: 'Ford',
+        model: 'Focus',
+        trim: 'Titanium',
+        colour: 'Blue',
+        mileage: 12345,
+        listPriceMinor: 2_599_000,
+        stockInDate: '2026-06-01',
+        daysInStock: 128,
+        currentAction: buildCurrentAction({
+          status: 'Price Reduction Planned',
+          loggedBy: 'Jane Smith',
+          loggedAt: '2026-10-07T13:32:00.000Z',
+        }),
+      });
+      const withoutAction = buildVehicle({ id: 2, stockNumber: 'STK-0002', daysInStock: 12 });
+      server.use(
+        http.get(vehiclesUrl(1), () =>
+          HttpResponse.json(buildVehiclePage([withAction, withoutAction])),
+        ),
+      );
+      renderTable();
+
+      const table = await screen.findByRole('table', { name: 'Xe tồn kho tại Birmingham' });
+      expect(
+        within(table)
+          .getAllByRole('columnheader')
+          .map((th) => th.textContent),
+      ).toEqual([
+        'Mã tồn kho',
+        'Hãng xe',
+        'Mẫu xe',
+        'Đời xe',
+        'Số ngày tồn kho',
+        'Tồn kho lâu',
+        'Hành động hiện tại',
+        'Giá niêm yết',
+        'Ngày nhập kho',
+        'Số dặm đã đi',
+        'Phiên bản',
+        'Màu sắc',
+        'Số VIN',
+      ]);
+
+      const agingRow = screen.getByRole('row', { name: /STK-0001/ });
+      const cells = within(agingRow)
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent);
+      expect(cells.slice(1, 3)).toEqual(['Ford', 'Focus']);
+      expect(cells[5]).toBe('Tồn kho lâu');
+      expect(cells[6]).toBe('Dự kiến giảm giá' + 'Jane Smith · 07/10/2026 14:32');
+      expect(cells[7]).toBe('25.990\u00a0£');
+      expect(cells[8]).toBe('01/06/2026');
+      expect(cells[9]).toBe('12.345 mi');
+      expect(cells.slice(10, 12)).toEqual(['Titanium', 'Blue']);
+      expect(within(agingRow).queryByText('Price Reduction Planned')).not.toBeInTheDocument();
+
+      const freshRow = screen.getByRole('row', { name: /STK-0002/ });
+      expect(within(freshRow).getByText('Chưa có hành động')).toBeVisible();
+      expect(within(freshRow).getByText('Chưa tồn kho lâu')).toHaveClass('sr-only');
+    });
+
+    it('translates the pagination summary and buttons', async () => {
+      renderTable();
+
+      expect(await screen.findByText('Hiển thị 1-25 / 30')).toBeVisible();
+      expect(screen.getByRole('navigation', { name: 'Phân trang' })).toHaveTextContent(
+        'Trang 1 / 2',
+      );
+      expect(screen.getByRole('button', { name: 'Trang sau' })).toBeVisible();
+    });
+
+    it('translates the loading, empty and error states', async () => {
+      server.use(
+        http.get(vehiclesUrl(1), () => HttpResponse.json(null, { status: 500 }), { once: true }),
+      );
+      const { unmount } = renderTable();
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('Không thể tải danh sách xe');
+      expect(alert).toHaveTextContent('Máy chủ đang gặp sự cố');
+      expect(within(alert).getByRole('button', { name: 'Thử lại' })).toBeVisible();
+      unmount();
+
+      renderTable(york);
+      expect(await screen.findByText('Không có xe tồn kho')).toBeVisible();
+      expect(screen.getByText('York hiện không có xe nào trong kho.')).toBeVisible();
+    });
+
+    it('announces loading in Vietnamese', async () => {
+      server.use(http.get(vehiclesUrl(1), () => delay('infinite')));
+      renderTable();
+
+      expect(await screen.findByRole('status')).toHaveTextContent('Đang tải danh sách xe…');
+    });
   });
 });

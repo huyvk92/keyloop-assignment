@@ -20,6 +20,7 @@ ADR that explains why.
 | Forms | `react-hook-form` + `@hookform/resolvers` + `zod` | One Zod schema per form |
 | Validation | `zod` | All external data: API, env, URL params, storage |
 | Errors | `react-error-boundary` | Root + route level |
+| i18n | `i18next` + `react-i18next` | EN (default) + VI, typed keys, see §17 |
 | Unit/integration tests | `vitest`, `@testing-library/react`, `user-event`, `jest-dom`, `msw` | |
 | Component docs | Storybook 10 (`@storybook/react-vite`, CSF Next) + addon-docs + addon-a11y + `msw-storybook-addon` | |
 | E2E (optional) | `@playwright/test` | Only if the TRD requires it |
@@ -189,7 +190,21 @@ only when a requirement calls for it. Register every store in the reset list in
 - Override API mocks per story with `beforeEach({ msw }) { msw.use(...) }`. Interactions go in
   `play: async ({ canvas, userEvent, args }) => { ... }`, using `expect`/`fn` from `storybook/test`.
 
-## 17. Git
+## 17. Internationalisation (EN/VI)
+
+- No hard-coded user-visible strings in components. Use `const { t } = useTranslation()` and add
+  every key to **both** `src/i18n/resources/en.ts` and `vi.ts`; the parity test fails otherwise.
+  This covers aria-labels, `alt`, `document.title`, and empty, loading, and error text.
+- Keys are grouped by feature (`inventory.table.header.days`). Interpolate values with
+  `t('key', { count })` and never concatenate strings.
+- Format dates, numbers, and money with the helpers bound to the current language
+  (`useFormatters()`), not with `Intl` directly in components.
+- Never translate data: make, model, notes, and names show as stored. Action statuses are canonical
+  values; display them with `t(`actionStatus.${status}`)`.
+- Tests render in English by default. For a Vietnamese assertion, call
+  `i18n.changeLanguage('vi')` in the test; setup resets it.
+
+## 18. Git
 
 Use Conventional Commits (`feat(booking): add slot picker [T-004]`), enforced by commitlint.
 lint-staged runs ESLint and Prettier on staged files.

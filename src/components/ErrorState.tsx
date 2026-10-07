@@ -1,4 +1,5 @@
 import type { ComponentProps } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/Button';
 import { cn } from '@/lib/cn';
 import { getErrorMessage } from '@/lib/error-messages';
@@ -6,19 +7,15 @@ import { getErrorMessage } from '@/lib/error-messages';
 type Props = Omit<ComponentProps<'div'>, 'title'> & {
   /** The thrown value; mapped to user-friendly text, never shown raw. */
   error: unknown;
+  /** Defaults to "Couldn't load data" in the current language. */
   title?: string;
   /** Shows a "Retry" button when provided (e.g. a query's `refetch`). */
   onRetry?: () => void;
 };
 
 /** Error region with a mapped message and an optional Retry action (AC-001.6). */
-export function ErrorState({
-  error,
-  title = "Couldn't load data",
-  onRetry,
-  className,
-  ...props
-}: Props) {
+export function ErrorState({ error, title, onRetry, className, ...props }: Props) {
+  const { t } = useTranslation();
   return (
     <div
       role="alert"
@@ -29,12 +26,12 @@ export function ErrorState({
       {...props}
     >
       <div>
-        <p className="font-semibold">{title}</p>
-        <p className="text-sm">{getErrorMessage(error)}</p>
+        <p className="font-semibold">{title ?? t('errors.state.defaultTitle')}</p>
+        <p className="text-sm">{getErrorMessage(error, t)}</p>
       </div>
       {onRetry && (
         <Button variant="secondary" size="sm" onClick={() => onRetry()}>
-          Retry
+          {t('common.retry')}
         </Button>
       )}
     </div>

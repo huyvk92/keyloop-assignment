@@ -197,3 +197,38 @@ Scaffold (`/init-react-app`) -> TDD implementation (`/implement-trd`) -> Review 
       the realism test's threshold; the data was adjusted, not the test.
     - STK-1042 is priced at £10,990, not £25,990, which is more realistic for a 2018 Focus.
       AC-001.7 keeps its own fixture.
+
+### 2026-10-07 · requirement change: English / Vietnamese UI (PRD v0.3, T-045..T-047)
+
+- **Trigger**: The stakeholder asked for Vietnamese and English. This contradicted PRD A-13
+  ("English UI") and the out-of-scope list, so I treated it as a requirement change rather than a
+  code tweak.
+- **Human decisions**: The user chose to commit the verified phase 1 web work first, so i18n
+  has its own reviewable commit, and to always default to English.
+- **Spec updates (by me)**:
+  - PRD v0.3: US-015 (Must, 6 ACs), BR-19 (language is presentation only; data and statuses
+    stay canonical), A-16 (English default, remembered per browser), and updated A-13, NFR-08,
+    and out-of-scope.
+  - TRD: ADR-009 (i18next + react-i18next, typed keys, no detector; versions checked against
+    React 19 / TS 6 before choosing), TA-25 and TA-26 (formats verified with `Intl` vi-VN first),
+    and Phase 1b T-045..T-047.
+  - The `react-best-practices` skill got an i18n section, and the reviewer checklist got a
+    hard-coded-string check, so later tasks follow the rule automatically.
+- **AI output**: `react-frontend-developer` built the i18n foundation, translated the UI, and
+  added the language switcher. It has 69/69 keys with a parity test; typed keys make a bad key
+  fail `tsc`; English output is byte-identical (the original tests pass unchanged).
+- **Validation**:
+  - `npm run validate` passed (web 192 tests, API 107) and the build passed.
+  - Real Chrome driven by `puppeteer-core`, installed in the scratchpad only and not in the
+    repo, against the real API:
+    - A first visit with a vi-VN browser shows English (AC-015.1).
+    - Selecting "Tiếng Việt" translates the page in place, with the URL `?page=2`, focus, and
+      data unchanged (AC-015.2, AC-015.5).
+    - Vietnamese formats show as "21/09/2026 09:30" and "11.290 £" (AC-015.4).
+    - The language survives a reload (AC-015.3).
+    - The select has a label and per-option `lang` (AC-015.6).
+- **Human decision**: Modified.
+- **Corrections (my Vietnamese copy review)**: "Khuyến mãi tiếp thị" (awkward and redundant)
+  became "Chạy khuyến mãi"; "Mã kho" (reads as "warehouse code") became "Mã tồn kho".
+- **Open**: The copy is reviewed by me, not by a native-speaker product owner. The bundle grew
+  to 130 kB gzip for the main chunk, and the ADR's 10-15 kB estimate was not measured separately.

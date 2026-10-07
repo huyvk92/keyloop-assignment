@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { Pagination } from '@/features/inventory';
+import { i18n } from '@/i18n';
 
 describe('Pagination', () => {
   it('summarises the visible range in a live region inside a labelled nav', () => {
@@ -68,5 +69,16 @@ describe('Pagination', () => {
 
     await user.keyboard('{Enter}');
     expect(screen.getByText('Page 2 of 2')).toBeVisible();
+  });
+
+  it('uses Vietnamese text and number grouping when Vietnamese is selected (AC-015.2)', async () => {
+    await i18n.changeLanguage('vi');
+    render(<Pagination page={2} pageSize={25} total={1200} onPageChange={vi.fn()} />);
+
+    const nav = screen.getByRole('navigation', { name: 'Phân trang' });
+    expect(within(nav).getByText('Hiển thị 26-50 / 1.200')).toHaveAttribute('aria-live', 'polite');
+    expect(nav).toHaveTextContent('Trang 2 / 48');
+    expect(screen.getByRole('button', { name: 'Trang trước' })).toHaveTextContent('Trước');
+    expect(screen.getByRole('button', { name: 'Trang sau' })).toHaveTextContent('Sau');
   });
 });

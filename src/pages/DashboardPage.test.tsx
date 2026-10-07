@@ -1,6 +1,7 @@
-import { act, screen } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import { delay, http, HttpResponse } from 'msw';
 import { routes } from '@/app/router';
+import { createI18n, i18n, LANGUAGE_STORAGE_KEY } from '@/i18n';
 import { apiUrl } from '@/lib/http';
 import { server } from '@/mocks/server';
 import { renderRoutes } from '@/test/render';
@@ -63,5 +64,69 @@ describe('DashboardPage', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Manchester' })).toBeVisible();
+  });
+
+  it('translates the page title and "Dealership not found" in Vietnamese (AC-015.2)', async () => {
+    await i18n.changeLanguage('vi');
+    renderRoutes(routes, { route: '/dealerships/99' });
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Không tìm thấy đại lý' }),
+    ).toBeVisible();
+    expect(document.title).toBe('Không tìm thấy đại lý · Bảng điều khiển tồn kho');
+    expect(screen.getByRole('link', { name: 'Đến bảng điều khiển' })).toHaveAttribute('href', '/');
+  });
+
+  describe('language switcher (US-015)', () => {
+    it('translates the page in place and keeps the dealership and URL state (AC-015.2)', async () => {
+      const { user, router } = renderRoutes(routes, { route: '/dealerships/1?page=2' });
+      expect(await screen.findByText('Showing 26-30 of 30')).toBeVisible();
+      const heading = screen.getByRole('heading', { level: 1, name: 'Birmingham' });
+      const before = router.state.location;
+
+      await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'Tiếng Việt');
+
+      expect(await screen.findByText('Hiển thị 26-30 / 30')).toBeVisible();
+      expect(screen.getByRole('table', { name: 'Xe tồn kho tại Birmingham' })).toBeVisible();
+      expect(screen.getByRole('navigation', { name: 'Điều hướng chính' })).toBeVisible();
+      expect(within(screen.getByRole('banner')).getByRole('link')).toHaveTextContent(
+        'Bảng điều khiển tồn kho',
+      );
+      expect(document.documentElement.lang).toBe('vi');
+      expect(document.title).toBe('Birmingham · Bảng điều khiển tồn kho');
+      // Same page, not a reload: same heading element, same location, no navigation.
+      expect(screen.getByRole('heading', { level: 1, name: 'Birmingham' })).toBe(heading);
+      expect(router.state.location.pathname).toBe('/dealerships/1');
+      expect(router.state.location.search).toBe('?page=2');
+      expect(router.state.location.key).toBe(before.key);
+      expect(screen.getByRole('combobox', { name: 'Ngôn ngữ' })).toHaveFocus();
+
+      await user.selectOptions(screen.getByRole('combobox', { name: 'Ngôn ngữ' }), 'English');
+
+      expect(await screen.findByText('Showing 26-30 of 30')).toBeVisible();
+      expect(document.documentElement.lang).toBe('en');
+      expect(document.title).toBe('Birmingham · Inventory dashboard');
+      expect(router.state.location.search).toBe('?page=2');
+    });
+
+    it('opens in Vietnamese after a reload when Vietnamese was chosen (AC-015.3)', async () => {
+      const { user, unmount } = renderRoutes(routes, { route: '/dealerships/2' });
+      await screen.findByRole('heading', { level: 1, name: 'Leeds' });
+      await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'vi');
+      expect(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('vi');
+      unmount();
+
+      // A reload loses the in-memory language and re-initialises from storage (TA-25):
+      // reset the app instance, then apply what a fresh initialisation resolves to.
+      await i18n.changeLanguage('en');
+      const reloaded = createI18n();
+      expect(reloaded.language).toBe('vi');
+      await i18n.changeLanguage(reloaded.language);
+      renderRoutes(routes, { route: '/dealerships/2' });
+
+      expect(await screen.findByText('Hiển thị 1-4 / 4')).toBeVisible();
+      expect(screen.getByRole('combobox', { name: 'Ngôn ngữ' })).toHaveValue('vi');
+      expect(document.documentElement.lang).toBe('vi');
+    });
   });
 });

@@ -1,4 +1,10 @@
-import { formatDate, formatDateTime, formatMileage, formatMoney } from '@/lib/format';
+import {
+  formatDate,
+  formatDateTime,
+  formatInteger,
+  formatMileage,
+  formatMoney,
+} from '@/lib/format';
 
 describe('formatMoney', () => {
   it('shows whole amounts without decimals (AC-001.7)', () => {
@@ -76,5 +82,54 @@ describe('month names', () => {
         formatDate(`2026-${m}-15`).slice(3, 6),
       ),
     ).toEqual(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);
+  });
+});
+
+describe('explicit en-GB locale', () => {
+  it('gives exactly the default (English) output', () => {
+    expect(formatMoney(2599000, 'GBP', 'en-GB')).toBe('£25,990');
+    expect(formatDate('2026-10-07', 'en-GB')).toBe('07 Oct 2026');
+    expect(formatDateTime('2026-10-07T13:32:00.000Z', 'Europe/London', 'en-GB')).toBe(
+      '07 Oct 2026, 14:32',
+    );
+    expect(formatMileage(12345, 'en-GB')).toBe('12,345 mi');
+    expect(formatInteger(1200)).toBe('1,200');
+  });
+});
+
+describe('vi-VN locale (AC-015.4, TA-26)', () => {
+  // Intl vi-VN puts a no-break space (U+00A0) between the amount and the currency symbol.
+  const NBSP = '\u00a0';
+
+  it('formats dates as dd/mm/yyyy', () => {
+    expect(formatDate('2026-10-07', 'vi-VN')).toBe('07/10/2026');
+    expect(formatDate('2025-12-31', 'vi-VN')).toBe('31/12/2025');
+    expect(() => formatDate('2026-02-30', 'vi-VN')).toThrow(RangeError);
+  });
+
+  it('formats timestamps as dd/mm/yyyy HH:mm, 24-hour, in the dealership time zone', () => {
+    expect(formatDateTime('2026-10-07T13:32:00.000Z', 'Europe/London', 'vi-VN')).toBe(
+      '07/10/2026 14:32',
+    );
+    expect(formatDateTime('2026-12-31T23:30:00.000Z', 'Europe/Paris', 'vi-VN')).toBe(
+      '01/01/2027 00:30',
+    );
+  });
+
+  it('formats money with Vietnamese separators, keeping the dealership currency', () => {
+    expect(formatMoney(2599000, 'GBP', 'vi-VN')).toBe(`25.990${NBSP}£`);
+    expect(formatMoney(2599050, 'GBP', 'vi-VN')).toBe(`25.990,50${NBSP}£`);
+    expect(formatMoney(1250000, 'EUR', 'vi-VN')).toBe(`12.500${NBSP}€`);
+  });
+
+  it('formats mileage and counts with Vietnamese grouping, unit stays "mi"', () => {
+    expect(formatMileage(12345, 'vi-VN')).toBe('12.345 mi');
+    expect(formatInteger(1200, 'vi-VN')).toBe('1.200');
+  });
+
+  it('does not change the English output once Vietnamese has been used (no shared cache)', () => {
+    formatMoney(2599000, 'GBP', 'vi-VN');
+    expect(formatMoney(2599000, 'GBP')).toBe('£25,990');
+    expect(formatMileage(12345)).toBe('12,345 mi');
   });
 });

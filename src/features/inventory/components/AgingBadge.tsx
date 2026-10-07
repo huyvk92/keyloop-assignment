@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/Badge';
 
 const clockIcon = (
@@ -9,9 +10,10 @@ const clockIcon = (
 
 /** "Aging" flag: visible text plus a decorative icon, never colour alone (AC-003.4). */
 export function AgingBadge() {
+  const { t } = useTranslation();
   return (
     <Badge tone="aging" icon={clockIcon}>
-      Aging
+      {t('inventory.agingBadge')}
     </Badge>
   );
 }
