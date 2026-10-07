@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { positiveIntParam } from './common';
+import { intParam } from './common';
 
 export const DealershipSchema = z.object({
   id: z.number().int().positive(),
@@ -16,6 +16,6 @@ export const DealershipListResponseSchema = z.object({ items: z.array(Dealership
 export type DealershipListResponse = z.infer<typeof DealershipListResponseSchema>;
 
 export const DealershipParamsSchema = z.object({
-  dealershipId: positiveIntParam(),
+  dealershipId: intParam({ min: 1 }),
 });
 export type DealershipParams = z.infer<typeof DealershipParamsSchema>;

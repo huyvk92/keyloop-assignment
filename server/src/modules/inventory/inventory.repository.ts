@@ -1,5 +1,6 @@
 import type { ActionStatus } from '@shared/api/actions';
 import type { SortKey, SortOrder } from '@shared/api/vehicles';
+import type { Statement } from 'better-sqlite3';
 import type { Db } from '../../db/connection';
 
 /** A vehicle row joined with its latest action (null columns = no action). */
@@ -21,8 +22,24 @@ export type VehicleRow = {
   actionLoggedAt: string | null;
 };
 
+/**
+ * Optional, ANDed list filters (BR-05). Age filters arrive as inclusive `stock_in_date` bounds
+ * computed by the service, so SQL never reads "now" (ADR-002). `search` is the raw, trimmed text;
+ * LIKE escaping is done here because it is an SQL concern.
+ */
+export type VehicleFilterCriteria = {
+  make?: string | undefined;
+  model?: string | undefined;
+  stockInFrom?: string | undefined;
+  stockInTo?: string | undefined;
+  search?: string | undefined;
+  /** Only vehicles with no action history (for "needs attention", BR-16). */
+  withoutAction?: boolean | undefined;
+};
+
 export type VehiclePageQuery = {
   dealershipId: number;
+  filter: VehicleFilterCriteria;
   sort: SortKey;
   order: SortOrder;
   limit: number;
@@ -36,9 +53,35 @@ export type VehiclePageQuery = {
 const ORDER_BY: Record<SortKey, Record<SortOrder, string>> = {
   age: { desc: 'v.stock_in_date ASC', asc: 'v.stock_in_date DESC' },
   price: { asc: 'v.list_price_minor ASC', desc: 'v.list_price_minor DESC' },
-  makeModel: { asc: 'v.make ASC, v.model ASC', desc: 'v.make DESC, v.model DESC' },
+  // NOCASE so "Hyundai i10" sorts before "Hyundai Tucson" (alphabetical, AC-011.2)
+  makeModel: {
+    asc: 'v.make COLLATE NOCASE ASC, v.model COLLATE NOCASE ASC',
+    desc: 'v.make COLLATE NOCASE DESC, v.model COLLATE NOCASE DESC',
+  },
 };
 const TIE_BREAK = 'v.stock_number ASC, v.id ASC';
+
+/**
+ * WHERE fragments: fixed SQL text with named parameters only. The query is assembled from the
+ * fragments whose filter is present (in this fixed order), so input never reaches the SQL text.
+ */
+const FILTER_SQL = {
+  make: 'v.make = @make',
+  model: 'v.model = @model',
+  stockInFrom: 'v.stock_in_date >= @stockInFrom',
+  stockInTo: 'v.stock_in_date <= @stockInTo',
+  // ASCII LIKE is case-insensitive in SQLite (BR-08, TA-08)
+  search: `(v.vin LIKE @search ESCAPE '\\' OR v.stock_number LIKE @search ESCAPE '\\'
+            OR v.model LIKE @search ESCAPE '\\')`,
+  withoutAction: 'NOT EXISTS (SELECT 1 FROM vehicle_actions x WHERE x.vehicle_id = v.id)',
+} as const satisfies Record<keyof VehicleFilterCriteria, string>;
+type FilterKey = keyof typeof FILTER_SQL;
+const FILTER_KEYS = Object.keys(FILTER_SQL) as FilterKey[];
+
+/** `%`, `_` and the escape character itself match literally (BR-08). */
+export function escapeLike(text: string): string {
+  return text.replace(/[\\%_]/g, '\\$&');
+}
 
 const SELECT_LIST = `
   SELECT v.id, v.dealership_id AS dealershipId, v.vin, v.stock_number AS stockNumber, v.make,
@@ -49,35 +92,68 @@ const SELECT_LIST = `
   LEFT JOIN vehicle_actions a ON a.id = (
     SELECT id FROM vehicle_actions WHERE vehicle_id = v.id
     ORDER BY logged_at DESC, id DESC LIMIT 1
-  )
-  WHERE v.dealership_id = @dealershipId`;
+  )`;
+const SELECT_COUNT = 'SELECT COUNT(*) FROM vehicles v';
 
-type PageParams = { dealershipId: number; limit: number; offset: number };
+export type MakeModelRow = { make: string; model: string };
 
-/** SQL only: inventory reads, scoped by dealership. */
+type SqlParams = Record<string, string | number>;
+
+/** Active filter keys and their named parameters. */
+function bindFilter(dealershipId: number, filter: VehicleFilterCriteria) {
+  const keys: FilterKey[] = [];
+  const params: SqlParams = { dealershipId };
+  for (const key of FILTER_KEYS) {
+    const value = filter[key];
+    if (value === undefined || value === false) continue;
+    keys.push(key);
+    if (key === 'search') params.search = `%${escapeLike(String(value))}%`;
+    else if (key !== 'withoutAction') params[key] = String(value);
+  }
+  const where = ['v.dealership_id = @dealershipId', ...keys.map((key) => FILTER_SQL[key])];
+  return { keys, params, where: `WHERE ${where.join(' AND ')}` };
+}
+
+/** SQL only: inventory reads, scoped by dealership (BR-04). */
 export function createInventoryRepository(db: Db) {
-  const countStatement = db
-    .prepare<[number], number>('SELECT COUNT(*) FROM vehicles WHERE dealership_id = ?')
-    .pluck();
-  // One prepared statement per whitelisted sort/order pair
-  const pageStatements = new Map(
-    Object.entries(ORDER_BY).flatMap(([sort, orders]) =>
-      Object.entries(orders).map(([order, orderBy]) => [
-        `${sort}:${order}`,
-        db.prepare<[PageParams], VehicleRow>(
-          `${SELECT_LIST} ORDER BY ${orderBy}, ${TIE_BREAK} LIMIT @limit OFFSET @offset`,
-        ),
-      ]),
-    ),
+  // Statements are prepared once per (filter combination, sort) and reused; the cache is bounded
+  // by 2^6 filter combinations x 6 orders.
+  const cache = new Map<string, Statement>();
+  function statement(key: string, sql: () => string, pluck = false): Statement {
+    let prepared = cache.get(key);
+    if (!prepared) {
+      prepared = db.prepare(sql()).pluck(pluck);
+      cache.set(key, prepared);
+    }
+    return prepared;
+  }
+
+  const makeModelStatement = db.prepare<[number], MakeModelRow>(
+    `SELECT DISTINCT make, model FROM vehicles WHERE dealership_id = ?
+     ORDER BY make COLLATE NOCASE, make, model COLLATE NOCASE, model`,
   );
 
   return {
-    listPage({ dealershipId, sort, order, limit, offset }: VehiclePageQuery) {
-      const statement = pageStatements.get(`${sort}:${order}`);
-      if (!statement) throw new Error(`Unsupported sort: ${sort} ${order}`);
+    /** Distinct make/model pairs in the dealership's stock, make then model A-Z ignoring case (BR-06). */
+    listMakeModels(dealershipId: number): MakeModelRow[] {
+      return makeModelStatement.all(dealershipId);
+    },
+
+    listPage({ dealershipId, filter, sort, order, limit, offset }: VehiclePageQuery) {
+      const orderBy = ORDER_BY[sort]?.[order];
+      if (!orderBy) throw new Error(`Unsupported sort: ${sort} ${order}`);
+      const { keys, params, where } = bindFilter(dealershipId, filter);
+      const filterKey = keys.join(',');
+
+      const page = statement(
+        `page|${filterKey}|${sort}:${order}`,
+        () =>
+          `${SELECT_LIST} ${where} ORDER BY ${orderBy}, ${TIE_BREAK} LIMIT @limit OFFSET @offset`,
+      );
+      const count = statement(`count|${filterKey}`, () => `${SELECT_COUNT} ${where}`, true);
       return {
-        rows: statement.all({ dealershipId, limit, offset }),
-        total: countStatement.get(dealershipId) ?? 0,
+        rows: page.all({ ...params, limit, offset }) as VehicleRow[],
+        total: (count.get(params) as number | undefined) ?? 0,
       };
     },
   };

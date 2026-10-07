@@ -1,7 +1,13 @@
 import { CurrentActionSchema } from './actions';
 import {
+  AGE_BUCKETS,
+  AGE_RANGE_ERROR_MESSAGE,
+  AgeRangeFormSchema,
+  FacetsResponseSchema,
+  MAX_AGE_DAYS,
   PAGE_SIZE_DEFAULT,
   PAGE_SIZE_MAX,
+  VehicleFilterBaseSchema,
   VehicleListItemSchema,
   VehicleListQuerySchema,
   VehicleListResponseSchema,
@@ -130,5 +136,137 @@ describe('VehicleParamsSchema', () => {
 
   it.each([['2'], [2]])('accepts the canonical id %j', (vehicleId) => {
     expect(VehicleParamsSchema.parse({ vehicleId })).toEqual({ vehicleId: 2 });
+  });
+});
+
+describe('VehicleListQuerySchema filters (T-013)', () => {
+  it('parses every filter field together', () => {
+    expect(
+      VehicleListQuerySchema.parse({
+        make: 'Ford',
+        model: 'Focus',
+        ageBucket: 'over-90',
+        minAge: '45',
+        maxAge: '120',
+        agingOnly: 'true',
+        needsAttention: 'false',
+        q: 'stk',
+      }),
+    ).toEqual({
+      make: 'Ford',
+      model: 'Focus',
+      ageBucket: 'over-90',
+      minAge: 45,
+      maxAge: 120,
+      agingOnly: true,
+      needsAttention: false,
+      q: 'stk',
+      sort: 'age',
+      page: 1,
+      pageSize: PAGE_SIZE_DEFAULT,
+    });
+  });
+
+  it('parses agingOnly=false as false (stringbool, not coerce)', () => {
+    expect(VehicleListQuerySchema.parse({ agingOnly: 'false' }).agingOnly).toBe(false);
+    expect(VehicleListQuerySchema.parse({ agingOnly: 'true' }).agingOnly).toBe(true);
+    expect(VehicleListQuerySchema.parse({ needsAttention: 'false' }).needsAttention).toBe(false);
+    expect(VehicleListQuerySchema.safeParse({ agingOnly: 'maybe' }).success).toBe(false);
+    expect(VehicleListQuerySchema.safeParse({ agingOnly: '' }).success).toBe(false);
+  });
+
+  it('rejects min 100 / max 50 on maxAge (AC-002.4, BR-07)', () => {
+    const result = VehicleListQuerySchema.safeParse({ minAge: '100', maxAge: '50' });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toEqual([
+      expect.objectContaining({ path: ['maxAge'], message: AGE_RANGE_ERROR_MESSAGE }),
+    ]);
+  });
+
+  it('accepts min = max, 0 and an open-ended range', () => {
+    expect(VehicleListQuerySchema.parse({ minAge: '60', maxAge: '60' })).toMatchObject({
+      minAge: 60,
+      maxAge: 60,
+    });
+    expect(VehicleListQuerySchema.parse({ minAge: '0' }).minAge).toBe(0);
+    expect(VehicleListQuerySchema.parse({ maxAge: '0' }).maxAge).toBe(0);
+    expect(VehicleListQuerySchema.parse({ minAge: '91' }).maxAge).toBeUndefined();
+  });
+
+  it.each(['-1', '1.5', '1e2', '0x1', ' 2', '', String(MAX_AGE_DAYS + 1)])(
+    'rejects the age %j',
+    (value) => {
+      expect(VehicleListQuerySchema.safeParse({ minAge: value }).success).toBe(false);
+      expect(VehicleListQuerySchema.safeParse({ maxAge: value }).success).toBe(false);
+    },
+  );
+
+  it('trims q and rejects an empty or over-long q (BR-08)', () => {
+    expect(VehicleListQuerySchema.parse({ q: ' stk ' }).q).toBe('stk');
+    expect(VehicleListQuerySchema.safeParse({ q: '' }).success).toBe(false);
+    expect(VehicleListQuerySchema.safeParse({ q: '   ' }).success).toBe(false);
+    expect(VehicleListQuerySchema.parse({ q: 'x'.repeat(100) }).q).toHaveLength(100);
+    expect(VehicleListQuerySchema.safeParse({ q: 'x'.repeat(101) }).success).toBe(false);
+  });
+
+  it('trims make and model and bounds their length', () => {
+    expect(VehicleListQuerySchema.parse({ make: ' Ford ', model: ' Focus ' })).toMatchObject({
+      make: 'Ford',
+      model: 'Focus',
+    });
+    expect(VehicleListQuerySchema.safeParse({ make: ' ' }).success).toBe(false);
+    expect(VehicleListQuerySchema.safeParse({ model: 'x'.repeat(51) }).success).toBe(false);
+  });
+
+  it('accepts the four buckets and rejects an unknown ageBucket (BR-07, TA-07)', () => {
+    expect(AGE_BUCKETS).toEqual(['0-30', '31-60', '61-90', 'over-90']);
+    for (const ageBucket of AGE_BUCKETS) {
+      expect(VehicleListQuerySchema.parse({ ageBucket }).ageBucket).toBe(ageBucket);
+    }
+    expect(VehicleListQuerySchema.safeParse({ ageBucket: '>90' }).success).toBe(false);
+    expect(VehicleListQuerySchema.safeParse({ ageBucket: '91-120' }).success).toBe(false);
+  });
+
+  it('keeps the base filter schema extendable (no refine on the base)', () => {
+    expect(() => VehicleFilterBaseSchema.extend({})).not.toThrow();
+    expect(VehicleFilterBaseSchema.parse({ minAge: '100', maxAge: '50' })).toMatchObject({
+      minAge: 100,
+      maxAge: 50,
+    });
+  });
+});
+
+describe('AgeRangeFormSchema (web inline range form)', () => {
+  it('applies the same min <= max rule on maxAge', () => {
+    const result = AgeRangeFormSchema.safeParse({ minAge: '100', maxAge: '50' });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['maxAge']);
+    expect(AgeRangeFormSchema.parse({ minAge: '45', maxAge: '90' })).toEqual({
+      minAge: 45,
+      maxAge: 90,
+    });
+  });
+
+  it('treats an empty input as "no bound" instead of 0', () => {
+    expect(AgeRangeFormSchema.parse({ minAge: '', maxAge: '30' })).toEqual({ maxAge: 30 });
+    expect(AgeRangeFormSchema.parse({ minAge: '91', maxAge: '' })).toEqual({ minAge: 91 });
+    expect(AgeRangeFormSchema.parse({})).toEqual({});
+  });
+
+  it('rejects negative, decimal and non-numeric input', () => {
+    expect(AgeRangeFormSchema.safeParse({ minAge: '-1' }).success).toBe(false);
+    expect(AgeRangeFormSchema.safeParse({ maxAge: '2.5' }).success).toBe(false);
+    expect(AgeRangeFormSchema.safeParse({ maxAge: 'ten' }).success).toBe(false);
+  });
+});
+
+describe('FacetsResponseSchema', () => {
+  it('parses makes with their models', () => {
+    const body = { makes: [{ make: 'Ford', models: ['Fiesta', 'Focus'] }] };
+    expect(FacetsResponseSchema.parse(body)).toEqual(body);
+    expect(FacetsResponseSchema.parse({ makes: [] })).toEqual({ makes: [] });
+    expect(FacetsResponseSchema.safeParse({ makes: [{ make: 'Ford' }] }).success).toBe(false);
   });
 });

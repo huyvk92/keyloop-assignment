@@ -1,6 +1,10 @@
 import { ApiErrorSchema } from '@shared/api/common';
 import { DealershipParamsSchema } from '@shared/api/dealerships';
-import { VehicleListQuerySchema, VehicleListResponseSchema } from '@shared/api/vehicles';
+import {
+  FacetsResponseSchema,
+  VehicleListQuerySchema,
+  VehicleListResponseSchema,
+} from '@shared/api/vehicles';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Db } from '../../db/connection';
 import type { Clock } from '../../lib/clock';
@@ -22,12 +26,26 @@ export const inventoryRoutes: FastifyPluginAsyncZod<Options> = async (app, { db,
     {
       schema: {
         tags: ['inventory'],
-        summary: 'Paged vehicle list with derived age, aging flag and current action',
+        summary:
+          'Paged vehicle list (filtered, searched and sorted) with derived age, aging flag and current action',
         params: DealershipParamsSchema,
         querystring: VehicleListQuerySchema,
         response: { 200: VehicleListResponseSchema, 400: ApiErrorSchema, 404: ApiErrorSchema },
       },
     },
     async (request) => service.listVehicles(request.params.dealershipId, request.query),
+  );
+
+  app.get(
+    '/dealerships/:dealershipId/facets',
+    {
+      schema: {
+        tags: ['inventory'],
+        summary: "Make/model filter options from the dealership's stock (A-Z)",
+        params: DealershipParamsSchema,
+        response: { 200: FacetsResponseSchema, 400: ApiErrorSchema, 404: ApiErrorSchema },
+      },
+    },
+    async (request) => service.getFacets(request.params.dealershipId),
   );
 };

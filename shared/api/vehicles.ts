@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { CurrentActionSchema } from './actions';
-import { positiveIntParam } from './common';
+import { intParam } from './common';
 
 /** A vehicle is aging when its age is strictly greater than this (BR-02; fixed, US-014). */
 export const AGING_THRESHOLD_DAYS = 90;
@@ -11,23 +11,61 @@ export type SortOrder = (typeof SORT_ORDERS)[number];
 export const PAGE_SIZE_DEFAULT = 25;
 export const PAGE_SIZE_MAX = 100;
 
+/** Inclusive age buckets in days (BR-07, TA-07): 0-30, 31-60, 61-90 and 91+. */
+export const AGE_BUCKETS = ['0-30', '31-60', '61-90', 'over-90'] as const;
+export type AgeBucket = (typeof AGE_BUCKETS)[number];
+/** Upper bound for a custom age (100 years); keeps date arithmetic in range. */
+export const MAX_AGE_DAYS = 36_500;
+export const SEARCH_MAX_LENGTH = 100; // BR-08, TA-08
+export const MAKE_MODEL_MAX_LENGTH = 50;
+export const AGE_RANGE_ERROR_MESSAGE = 'Minimum age must be less than or equal to maximum age';
+
+const ageParam = intParam({ min: 0, max: MAX_AGE_DAYS });
+const ageRangeValid = (range: { minAge?: number | undefined; maxAge?: number | undefined }) =>
+  range.minAge === undefined || range.maxAge === undefined || range.minAge <= range.maxAge;
+const ageRangeIssue = { message: AGE_RANGE_ERROR_MESSAGE, path: ['maxAge'] };
+
 /**
- * Filter fields shared by the paged list and (later) the CSV export. Kept as a plain object so
- * it can be extended. When `order` is omitted the server uses the per-key default (TA-06).
+ * Filter fields shared by the paged list and (later) the CSV export. Kept as a plain, unrefined
+ * object so it can be extended (Zod 4 forbids .extend on refined objects); the min <= max refine
+ * is applied last on each final schema. All filters combine with AND (BR-05). Make and model are
+ * single values (TA-02). When `order` is omitted the server uses the per-key default (TA-06).
  */
 export const VehicleFilterBaseSchema = z.object({
+  make: z.string().trim().min(1).max(MAKE_MODEL_MAX_LENGTH).optional(),
+  model: z.string().trim().min(1).max(MAKE_MODEL_MAX_LENGTH).optional(),
+  ageBucket: z.enum(AGE_BUCKETS).optional(),
+  minAge: ageParam.optional(),
+  maxAge: ageParam.optional(),
+  /** 'true'/'false' (also 1/0, yes/no); z.coerce.boolean would turn 'false' into true. */
+  agingOnly: z.stringbool().optional(),
+  /** Aging and no current action (BR-16). */
+  needsAttention: z.stringbool().optional(),
+  /** Partial, case-insensitive match on VIN, stock number or model, trimmed (BR-08). */
+  q: z.string().trim().min(1).max(SEARCH_MAX_LENGTH).optional(),
   sort: z.enum(SORT_KEYS).default('age'),
   order: z.enum(SORT_ORDERS).optional(),
 });
+export type VehicleFilter = z.infer<typeof VehicleFilterBaseSchema>;
 
 /** Query string of GET /api/dealerships/:dealershipId/vehicles (also the dashboard URL state). */
 export const VehicleListQuerySchema = VehicleFilterBaseSchema.extend({
-  page: positiveIntParam().default(1),
-  pageSize: positiveIntParam({ max: PAGE_SIZE_MAX }).default(PAGE_SIZE_DEFAULT),
-});
+  page: intParam({ min: 1 }).default(1),
+  pageSize: intParam({ min: 1, max: PAGE_SIZE_MAX }).default(PAGE_SIZE_DEFAULT),
+}).refine(ageRangeValid, ageRangeIssue); // BR-07, AC-002.4
 export type VehicleListQuery = z.infer<typeof VehicleListQuerySchema>;
 /** Raw (pre-default, pre-coercion) query, e.g. what the web puts in the URL. */
 export type VehicleListQueryInput = z.input<typeof VehicleListQuerySchema>;
+
+/** Empty form input means "no bound" (not 0). */
+const ageFormField = z.union([z.literal('').transform(() => undefined), ageParam]).optional();
+
+/** The web's inline custom-range form: same bounds and min <= max rule as the query (BR-07). */
+export const AgeRangeFormSchema = z
+  .object({ minAge: ageFormField, maxAge: ageFormField })
+  .refine(ageRangeValid, ageRangeIssue);
+export type AgeRangeForm = z.infer<typeof AgeRangeFormSchema>;
+export type AgeRangeFormInput = z.input<typeof AgeRangeFormSchema>;
 
 export const VehicleListItemSchema = z.object({
   id: z.number().int().positive(),
@@ -63,5 +101,12 @@ export const VehicleListResponseSchema = z.object({
 });
 export type VehicleListResponse = z.infer<typeof VehicleListResponseSchema>;
 
-export const VehicleParamsSchema = z.object({ vehicleId: positiveIntParam() });
+export const VehicleParamsSchema = z.object({ vehicleId: intParam({ min: 1 }) });
 export type VehicleParams = z.infer<typeof VehicleParamsSchema>;
+
+/** GET /api/dealerships/:dealershipId/facets - distinct makes A-Z, each with its models A-Z (BR-06). */
+export const FacetsResponseSchema = z.object({
+  makes: z.array(z.object({ make: z.string(), models: z.array(z.string()) })),
+});
+export type FacetsResponse = z.infer<typeof FacetsResponseSchema>;
+export type MakeFacet = FacetsResponse['makes'][number];

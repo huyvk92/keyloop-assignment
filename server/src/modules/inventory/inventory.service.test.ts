@@ -176,4 +176,77 @@ describe('inventory service listVehicles', () => {
   it('throws NotFoundError for an unknown dealership', () => {
     expect(() => service().listVehicles(dealershipId + 1, defaults)).toThrow(NotFoundError);
   });
+
+  describe('filters (T-015)', () => {
+    const stock = (
+      query: Parameters<ReturnType<typeof service>['listVehicles']>[1],
+      clock?: Clock,
+    ) =>
+      service(clock)
+        .listVehicles(dealershipId, query)
+        .items.map((v) => v.stockNumber);
+
+    it('needsAttention = aging AND no action, ANDed with other filters (BR-16, BR-05)', () => {
+      const actioned = insertVehicle(db, { dealershipId, ageDays: 200, stockNumber: 'STK-1' });
+      insertVehicle(db, { dealershipId, ageDays: 91, make: 'Kia', stockNumber: 'STK-2' });
+      insertVehicle(db, { dealershipId, ageDays: 95, make: 'Ford', stockNumber: 'STK-3' });
+      insertVehicle(db, { dealershipId, ageDays: 90, make: 'Ford', stockNumber: 'STK-4' });
+      insertAction(db, { vehicleId: actioned });
+
+      expect(stock({ ...defaults, needsAttention: true })).toEqual(['STK-3', 'STK-2']);
+      expect(stock({ ...defaults, needsAttention: true, make: 'Ford' })).toEqual(['STK-3']);
+      expect(stock({ ...defaults, needsAttention: false })).toHaveLength(4);
+      expect(stock({ ...defaults, needsAttention: true, ageBucket: '61-90' })).toEqual([]);
+    });
+
+    it('returns an empty page for an empty age intersection without failing (TA-07)', () => {
+      insertVehicle(db, { dealershipId, ageDays: 10 });
+
+      expect(
+        service().listVehicles(dealershipId, { ...defaults, ageBucket: '0-30', minAge: 31 }),
+      ).toEqual({ items: [], total: 0, page: 1, pageSize: 25 });
+    });
+
+    it('still 404s for an unknown dealership when the intersection is empty', () => {
+      expect(() =>
+        service().listVehicles(dealershipId + 1, {
+          ...defaults,
+          ageBucket: '0-30',
+          agingOnly: true,
+        }),
+      ).toThrow(NotFoundError);
+    });
+
+    it('moves the bucket bounds with the clock: 90 joins over-90 the next day (BR-03)', () => {
+      insertVehicle(db, { dealershipId, stockInDate: '2026-07-09', stockNumber: 'STK-90' });
+      const query = { ...defaults, ageBucket: 'over-90' } as const;
+
+      expect(stock(query, fixedClock('2026-10-07'))).toEqual([]);
+      expect(stock(query, fixedClock('2026-10-08'))).toEqual(['STK-90']);
+    });
+  });
+});
+
+describe('inventory service getFacets', () => {
+  it('groups distinct make/model pairs, both A-Z (BR-06)', () => {
+    for (const [make, model] of [
+      ['Kia', 'Niro'],
+      ['Ford', 'Puma'],
+      ['Ford', 'Fiesta'],
+      ['Ford', 'Puma'],
+    ] as const) {
+      insertVehicle(db, { dealershipId, make, model });
+    }
+
+    expect(service().getFacets(dealershipId)).toEqual({
+      makes: [
+        { make: 'Ford', models: ['Fiesta', 'Puma'] },
+        { make: 'Kia', models: ['Niro'] },
+      ],
+    });
+  });
+
+  it('throws NotFoundError for an unknown dealership', () => {
+    expect(() => service().getFacets(dealershipId + 1)).toThrow(NotFoundError);
+  });
 });
