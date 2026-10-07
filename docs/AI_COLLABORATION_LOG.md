@@ -140,3 +140,60 @@ Scaffold (`/init-react-app`) -> TDD implementation (`/implement-trd`) -> Review 
      (v0.2) instead of leaving them only as TAs: A-14 vs NFR-05 (refresh every 60 s) and BR-06
      "make(s)" (single selection).
   4. The TRD template still said React 18, so it now says 19.
+
+### 2026-10-07 · implement-trd phase 1 (T-001..T-012)
+
+- **Goal**: Deliver the thin vertical slice: shared contract, schema, seed, and dealerships and
+  vehicles APIs, plus the web list with age, the "Aging" label, and pagination.
+- **Agent/skill**: `/implement-trd` (me as orchestrator). `node-backend-developer` did
+  T-001..T-006. `react-frontend-developer` did T-007 and T-009 in parallel, then T-008, T-010, and
+  T-011. Each agent ran only the tests for its own area while the other was working; I ran the
+  full gate after each wave.
+- **My verification per wave**:
+  - Ran `npm run validate`.
+  - Read the date maths (UTC epoch days, so DST-safe) and the repository SQL (parameters,
+    whitelisted ORDER BY, latest-action subquery).
+  - Called the real API and swept all 730 seeded vehicles: 90 days is never aging and 91 always
+    is, in every dealership; lists are sorted oldest first; York has 0 vehicles.
+- **T-012 slice check (real app)**: `rm -rf server/data && APP_TODAY=2026-10-07 npm run dev`,
+  rendered in headless Chrome at 1280x800 (DOM dump + screenshot):
+  - `/` redirects to Birmingham, with 25 rows and "Showing 1-25 of 360, Page 1 of 15".
+  - The oldest vehicle (400 days) is labelled Aging, and action times show in London time.
+  - After a restart the data is identical (`seeded: []`), so it was not reseeded.
+  - Swagger lists the 3 endpoints.
+- **Corrections I made**:
+  - Error copy: 5xx is no longer described as "couldn't reach the server", and the
+    VEHICLE_NOT_AGING text now explains the 90-day rule.
+  - Chrome printed "Sept" while Node printed "Sep", which only a real browser showed. The month
+    names are now a fixed table with a test.
+  - "Aging" and "Current action" were cut off at 1280 px. I reordered the columns so they come
+    first.
+- **End-of-phase review** (`code-reviewer` + `test-engineer`, run in parallel and read-only):
+  - The verdict was CHANGES REQUESTED, with no blockers. I re-checked the code for each MAJOR:
+    1. Switching dealership briefly showed the previous dealership's rows (`keepPreviousData`
+       was not scoped by dealership; BR-04).
+    2. The seeder logged actions on vehicles that were exactly 90 days old (`age - 90`; BR-09).
+    3. The seed test lacked the assertion that would have caught (2).
+    4. I had ticked T-012 before logging it, which this entry fixes.
+  - The tester reproduced a flaky lazy-route test under CPU load. It also found the DB status
+    CHECK duplicating `ACTION_STATUSES` with no drift test.
+  - Two report items were explained, not acted on. "93 tests instead of 92" was the reviewer's
+    temporary probe test running at the same time. "Tasks not ticked" was a stale read.
+- **Decision**: Fix all MAJORs and most MINOR and NIT items before committing. The backend agent
+  and the web agent fix them in parallel, on disjoint files. The text-ordered stock-number
+  tie-break is recorded as TA-24 instead of changed. MSW keeping the last value of a duplicate
+  query key is accepted as a known gap.
+- **Fix-round outcome (verified by me)**:
+  - `npm run validate` passed: web 152 tests (99.6% statements), API 107 tests (98.9%). The
+    web build and the Storybook build passed.
+  - After reseeding, 122 actions exist. Only STK-1302, the intentional A-15 vehicle at 45 days,
+    was logged while not aging. Every `logged_at` has milliseconds.
+  - Headless Chrome against the real API: Birmingham shows 1-25 of 360 with no "Sept"; York
+    shows the "No vehicles in stock" empty state.
+  - Each new behavioural test failed before its fix. Tests for behaviour that was already
+    correct were kept as regression guards.
+  - Accepted deviations:
+    - Leeds history share 0.4 → 0.5. The fix shifted the PRNG sequence and landed exactly on
+      the realism test's threshold; the data was adjusted, not the test.
+    - STK-1042 is priced at £10,990, not £25,990, which is more realistic for a 2018 Focus.
+      AC-001.7 keeps its own fixture.

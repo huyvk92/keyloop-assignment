@@ -44,7 +44,8 @@ src/
 ```
 
 - Import other features only through their `index.ts`; never deep-import `features/x/components/...`.
-- Use the `@/` alias rather than `../../` imports.
+- Use the `@/` alias to leave a folder. Inside a feature, one `../` to a sibling folder
+  (`components` → `../api`, `../hooks`) is allowed; `../../` is not (ESLint enforces this).
 - Shared components in `src/components/` don't know about features or fetch data.
 
 ## 3. Components

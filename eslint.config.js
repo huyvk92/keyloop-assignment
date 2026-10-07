@@ -52,6 +52,47 @@ export default defineConfig([
     },
   },
   {
+    // Inside a feature, sibling folders (components -> api/hooks) are reached with one `../`.
+    // Leaving the feature (`../../`) or deep-importing another feature stays forbidden.
+    files: ['src/features/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['../../*'],
+              message: 'Leave a feature through the @/ alias, not parent-relative imports.',
+            },
+            {
+              group: ['@/features/*/*'],
+              message: 'Import other features only through their index.ts (@/features/<name>).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // Files directly in a feature root (index.ts, types.ts, store.ts) have no sibling folder
+    // above them inside the feature: any `../` leaves the feature, so it stays forbidden.
+    files: ['src/features/*/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['../*'], message: 'Use the @/ alias instead of parent-relative imports.' },
+            {
+              group: ['@/features/*/*'],
+              message: 'Import other features only through their index.ts (@/features/<name>).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['src/**/*.test.{ts,tsx}'],
     extends: [testingLibrary.configs['flat/react']],
   },

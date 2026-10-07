@@ -1,11 +1,4 @@
-import { NavLink, Outlet } from 'react-router';
-import { cn } from '@/lib/cn';
-
-const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  cn(
-    'rounded-md px-3 py-2 text-sm font-medium focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none',
-    isActive ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:text-slate-900',
-  );
+import { Link, Outlet } from 'react-router';
 
 export function Layout() {
   return (
@@ -17,13 +10,16 @@ export function Layout() {
         Skip to content
       </a>
       <header className="border-b border-slate-200 bg-white">
-        <nav aria-label="Main" className="mx-auto flex max-w-5xl items-center gap-2 px-4 py-3">
-          <NavLink to="/" end className={navLinkClass}>
-            Home
-          </NavLink>
+        <nav aria-label="Main" className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-3">
+          <Link
+            to="/"
+            className="rounded-md px-1 py-1 text-lg font-semibold text-slate-900 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
+          >
+            Inventory Dashboard
+          </Link>
         </nav>
       </header>
-      <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
+      <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-4 py-8">
         <Outlet />
       </main>
       <footer className="border-t border-slate-200 py-4 text-center text-sm text-slate-500">

@@ -1,7 +1,10 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { server } from '@/mocks/server';
 import { useUiStore } from '@/stores/ui-store';
+
+// Lazy routes pay a cold dynamic import on first render; the 1 s default flakes under CPU load.
+configure({ asyncUtilTimeout: 3000 });
 
 // Register every Zustand store here so each test starts from its initial state.
 const stores = [useUiStore];
