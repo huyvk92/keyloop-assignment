@@ -66,3 +66,20 @@ Scaffold (`/init-react-app`) -> TDD implementation (`/implement-trd`) -> Review 
   staged files ignored by ESLint (`public/mockServiceWorker.js`) produce a warning, which
   `--max-warnings=0` turns into a failed commit. Added `--no-warn-ignored`. The skill and its
   reference are updated.
+
+### 2026-10-07 · create-prd
+
+- **Goal**: Turn the Keyloop "Intelligent Inventory Dashboard" brief into a PRD.
+- **Agent/skill**: `/create-prd` → `business-analyst` subagent.
+- **AI output**: `docs/PRD.md` with 14 stories (7 Must, 5 Should, 1 Could, 1 Won't), 18 business
+  rules, 55 Given/When/Then acceptance criteria, 10 NFRs, 15 assumptions, 2 process flows.
+- **Human input**: One blocking question was asked: where persistence lives. The user chose a
+  real Node.js backend with seeded mock data (recorded as A-03). The other 14 ambiguities were
+  settled with assumptions I set before delegating.
+- **Validation**: Checked every Must story for testable ACs, every BR for AC coverage, and the
+  PRD for technology leakage. Recomputed the boundary dates (2026-07-09 = 90 days,
+  2026-07-08 = 91) and the KPI example (mean 601/8 = 75; aging 3/8 = 37.5%); both are correct.
+- **Human decision**: Modified.
+- **Corrections**: (1) BR-18 (server-side validation) had no AC for BR-12. Added a
+  service-level rejection of an empty "Logged by" to AC-006.4 and to the traceability table.
+  (2) AC-001.7 silently assumed GBP; made it explicit in A-13.
