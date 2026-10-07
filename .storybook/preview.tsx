@@ -14,8 +14,11 @@ import '@/index.css';
 /**
  * Fresh QueryClient per story so cached data never leaks between stories. `locale` comes from
  * the toolbar; it switches the i18n language only (not stored, so reloading Storybook is English).
+ * `route` (from `parameters.route`) is the router's initial URL.
  */
-function StoryProviders({ locale, children }: { locale: unknown; children: ReactNode }) {
+type ProvidersProps = { locale: unknown; route: unknown; children: ReactNode };
+
+function StoryProviders({ locale, route, children }: ProvidersProps) {
   const [queryClient] = useState(
     () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
   );
@@ -26,7 +29,10 @@ function StoryProviders({ locale, children }: { locale: unknown; children: React
   return (
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter>{children}</MemoryRouter>
+        {/* `parameters.route` opens a story at a URL, e.g. one with filters in the search params. */}
+        <MemoryRouter initialEntries={typeof route === 'string' ? [route] : undefined}>
+          {children}
+        </MemoryRouter>
       </QueryClientProvider>
     </I18nextProvider>
   );
@@ -67,8 +73,8 @@ export default definePreview({
     controls: { matchers: { color: /(background|color)$/i, date: /Date$/i } },
   },
   decorators: [
-    (Story, { globals }) => (
-      <StoryProviders locale={globals.locale}>
+    (Story, { globals, parameters }) => (
+      <StoryProviders locale={globals.locale} route={parameters.route}>
         <Story />
       </StoryProviders>
     ),

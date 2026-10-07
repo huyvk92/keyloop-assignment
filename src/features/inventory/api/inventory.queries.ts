@@ -1,6 +1,6 @@
 import type { VehicleListQuery } from '@shared/api/vehicles';
 import { queryOptions, useQuery } from '@tanstack/react-query';
-import { getVehicles } from './inventory.api';
+import { getFacets, getVehicles } from './inventory.api';
 
 /** Every inventory key starts with `['inventory', dealershipId]` so one prefix refreshes all. */
 export const inventoryKeys = {
@@ -8,6 +8,7 @@ export const inventoryKeys = {
   dealership: (dealershipId: number) => [...inventoryKeys.all, dealershipId] as const,
   vehicles: (dealershipId: number, query: VehicleListQuery) =>
     [...inventoryKeys.dealership(dealershipId), 'vehicles', query] as const,
+  facets: (dealershipId: number) => [...inventoryKeys.dealership(dealershipId), 'facets'] as const,
 };
 
 /** Freshness: 60 s polling while visible, refetch on focus (ADR-007, TA-14). */
@@ -27,3 +28,13 @@ export const vehicleListOptions = (dealershipId: number, query: VehicleListQuery
 
 export const useVehicleList = (dealershipId: number, query: VehicleListQuery) =>
   useQuery(vehicleListOptions(dealershipId, query));
+
+/** Makes and models change only when stock changes: 5 min stale time, no polling (TRD section 5). */
+export const facetsOptions = (dealershipId: number) =>
+  queryOptions({
+    queryKey: inventoryKeys.facets(dealershipId),
+    queryFn: ({ signal }) => getFacets(dealershipId, signal),
+    staleTime: 5 * 60_000,
+  });
+
+export const useFacets = (dealershipId: number) => useQuery(facetsOptions(dealershipId));

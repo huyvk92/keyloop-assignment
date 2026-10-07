@@ -20,6 +20,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    // Multi-step async UI tests (placeholder data, refetch, navigation) exceeded the 5 s default
+    // under CPU contention (parallel agents, CI runners). Assertions still use findBy* waits.
+    testTimeout: 15_000,
     css: true,
     include: ['src/**/*.test.{ts,tsx}', 'shared/**/*.test.ts'],
     coverage: {

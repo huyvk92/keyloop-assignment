@@ -5,7 +5,7 @@ import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { PageSection } from '@/components/PageSection';
 import { DealershipSelector, useDealership } from '@/features/dealerships';
-import { VehicleTable } from '@/features/inventory';
+import { FilterBar, useCanonicalSearch, VehicleTable } from '@/features/inventory';
 import { shouldKeepFocus } from '@/lib/navigation-focus';
 
 /** `/dealerships/:dealershipId`: the dealership comes from the path (ADR-008, AC-008.3). */
@@ -16,6 +16,8 @@ export function DashboardPage() {
   const { data: dealership, error, isPending, isError, refetch } = useDealership(dealershipId);
   // A switch from the selector keeps focus on the select; Back/links still focus the h1.
   const keepFocus = shouldKeepFocus(useLocation().state);
+  // The one owner of URL clean-up for the filters and the list (TA-09).
+  useCanonicalSearch();
 
   if (isPending) {
     return (
@@ -54,6 +56,8 @@ export function DashboardPage() {
       focusHeadingOnChange={!keepFocus}
       actions={<DealershipSelector dealershipId={dealership.id} />}
     >
+      {/* Keyed by dealership: a switch drops the search draft and any pending debounce (TA-10). */}
+      <FilterBar key={dealership.id} dealershipId={dealership.id} />
       <VehicleTable dealership={dealership} />
     </PageSection>
   );

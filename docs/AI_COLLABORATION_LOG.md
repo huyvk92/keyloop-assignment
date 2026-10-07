@@ -270,3 +270,58 @@ Scaffold (`/init-react-app`) -> TDD implementation (`/implement-trd`) -> Review 
   when the user asked to keep it. No sidebar UI is added, so `isSidebarOpen` stays unused until a
   requirement needs it. It remains the reference Zustand example until T-037 adds the first
   feature store.
+
+### 2026-10-07 · implement-trd phase 2 (filters, sort, facets: T-013..T-016, T-018..T-020)
+
+- **Waves**: Wave 1 was the backend (`node-backend-developer`: contract, age-to-date-range
+  translation, filtering, search, and sort, plus the facets endpoint). Wave 2 was the web
+  (`react-frontend-developer`: URL-state hook, FilterBar, and age range with the no-match state).
+  The web depends on the contract, so the waves ran in sequence.
+- **Agent self-checks that caught bugs**:
+  - The backend agent's real curl check showed facets sorted `["Tucson","i10"]` (SQLite
+    ordering is case-sensitive), which led to `COLLATE NOCASE` and TA-27.
+  - The web agent caught a race in its own count assertions and a wrong fixture age calculation
+    by running its tests.
+- **My verification**:
+  - I read the dynamic-WHERE repository code: fixed fragments with named parameters, LIKE with
+    ESCAPE, a bounded statement cache.
+  - Flaky tests: 3 web tests timed out at 5 s in 2 of 7 full runs, both while other processes
+    were running, and passed in 5 idle runs. They wait on several async steps, so I raised
+    `testTimeout` to 15 s and documented why.
+  - Real Chrome via puppeteer-core:
+    - Ford gives 25 rows, and the model list is Ford-only.
+    - Changing the make to Toyota clears `model=Focus`.
+    - Aging only gives 5 rows.
+    - Typing " stk-104 " sends exactly 1 request.
+    - Min 100 / max 50 shows an inline error and the URL is unchanged.
+    - Clear filters restores the rows and focuses the filters.
+    - axe reports 0 violations in EN and VI, and there is no overflow at 768 px.
+- **End-of-phase review**:
+  - The code reviewer APPROVED, with 3 MINOR findings:
+    - Clear filters leaves a stale range draft (affects AC-002.8).
+    - Several live regions announce at once.
+    - The perf `beforeAll` is fragile under load.
+  - The test engineer found 0 IDs uncovered and could not make any test flake, including runs
+    under 6 CPU hogs. Top gap: nothing guards the MSW mock against drifting from the API, because
+    the filter logic exists in two copies.
+- **Decision**: Fix all of it in one round, with two agents on disjoint files.
+  - Backend agent: a shared scenario table (`shared/api/vehicles.cases.ts`) run against both the
+    real API (`app.inject`) and the MSW mock, ASCII-only case folding in the mock to match
+    SQLite, perf bulk insert, and the int-param helper merge.
+  - Web agent: the stale range draft, a single live announcer, single URL canonicalisation,
+    search-history semantics (TA-28), and the missing tests (URL sort, inclusive range bounds,
+    Vietnamese interaction, single-filter reset).
+- **Fix-round outcome (verified by me)**:
+  - `npm run validate` passed: web 388 tests, API 211.
+  - Real Chrome:
+    - AC-002.8: entering 100/50, Apply (error), then Clear filters leaves both range inputs
+      empty, no error, and no "No vehicles in stock" flash.
+    - TA-28: typing "stk" then "stk-10", one Back returns to `?make=Ford`.
+  - The parity table paid off immediately: 3 mock-only divergences (Unicode vs SQLite ASCII
+    case folding) were fixed in the mock, with the server as the source of truth.
+  - The web agent's new tests exposed a real bug: an empty placeholder briefly showed "No
+    vehicles in stock" after Clear filters.
+- **Accepted with a caveat**: `MatchCount` keeps polls silent by remounting the live region
+  when the same query's text changes. That relies on common screen-reader behaviour, and
+  VoiceOver may differ. Paging is no longer announced. Both are queued for T-038 with a real
+  screen-reader check rather than taken as done.

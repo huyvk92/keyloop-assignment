@@ -18,4 +18,11 @@ describe('EmptyState', () => {
     expect(screen.getByText('Try widening your search.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Clear filters' })).toBeInTheDocument();
   });
+
+  it('can opt out of the status role when another region announces the same outcome', () => {
+    render(<EmptyState title="No vehicles match your filters" announce={false} />);
+
+    expect(screen.getByText('No vehicles match your filters')).toBeVisible();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
 });

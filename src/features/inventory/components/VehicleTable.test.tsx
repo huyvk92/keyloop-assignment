@@ -10,6 +10,7 @@ import {
   buildVehiclePage,
 } from '@/mocks/fixtures';
 import { server } from '@/mocks/server';
+import { recordAnnouncements } from '@/test/announcements';
 import { renderWithProviders } from '@/test/render';
 
 const birmingham = buildDealership({ id: 1, name: 'Birmingham' });
@@ -120,26 +121,33 @@ describe('VehicleTable', () => {
     expect(router.state.location.search).toBe('');
   });
 
-  it('keeps the current page visible and announces "Updating…" while the next page loads', async () => {
+  it('keeps the current page visible and shows "Updating…" while the next page loads', async () => {
     const { user } = renderTable();
     expect(await screen.findByText('Showing 1-25 of 30')).toBeVisible();
 
     server.use(http.get(vehiclesUrl(1), () => delay('infinite')));
     await user.click(screen.getByRole('button', { name: 'Next page' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Updating…');
+    // A visible hint, not a live region: the filter bar's count is the one result announcer.
+    const hint = await screen.findByText('Updating…');
+    expect(hint).toBeVisible();
+    expect(hint).not.toHaveAttribute('aria-live');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.getByRole('row', { name: /STK-1001/ })).toBeVisible();
   });
 
   it('does not announce background refreshes (60 s polling, ADR-007)', async () => {
     const { queryClient } = renderTable();
     expect(await screen.findByText('Showing 1-25 of 30')).toBeVisible();
+    const { announcements } = recordAnnouncements();
 
     server.use(http.get(vehiclesUrl(1), () => delay('infinite')));
     act(() => void queryClient.refetchQueries());
 
     await waitFor(() => expect(queryClient.isFetching()).toBe(1));
-    expect(screen.getByRole('status')).toHaveTextContent('');
+    expect(screen.queryByText('Updating…')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(announcements).toEqual([]);
   });
 
   it('keeps the list and shows a quiet hint when a background refresh fails', async () => {
@@ -152,6 +160,7 @@ describe('VehicleTable', () => {
     expect(await screen.findByText(/couldn't refresh the list/i)).toBeVisible();
     expect(screen.getByRole('row', { name: /STK-1001/ })).toBeVisible();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('opens the page from the URL and replaces a page past the end with the last page (TA-05)', async () => {
@@ -172,7 +181,9 @@ describe('VehicleTable', () => {
   it('shows "No vehicles in stock" for a dealership without stock (AC-001.5)', async () => {
     renderTable(york);
 
+    // With no filters there is no match count to announce it, so the empty state is the status.
     expect(await screen.findByText('No vehicles in stock')).toBeVisible();
+    expect(screen.getByRole('status')).toHaveTextContent('No vehicles in stock');
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Pagination' })).not.toBeInTheDocument();
   });

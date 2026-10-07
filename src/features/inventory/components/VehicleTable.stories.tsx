@@ -39,6 +39,15 @@ export const Empty = meta.story({
   },
 });
 
+/** Filters in the URL match nothing: message plus Clear filters (AC-002.8). */
+export const NoMatch = meta.story({
+  parameters: { route: '/?q=no-such-vehicle' },
+  play: async ({ canvas }) => {
+    await expect(await canvas.findByText('No vehicles match your filters')).toBeVisible();
+    await expect(canvas.getByRole('button', { name: 'Clear filters' })).toBeVisible();
+  },
+});
+
 export const LoadError = meta.story({
   beforeEach({ msw }) {
     msw.use(http.get(vehiclesUrl, () => HttpResponse.json(null, { status: 503 })));

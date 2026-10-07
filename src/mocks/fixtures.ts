@@ -2,12 +2,15 @@ import { CurrentActionSchema, type CurrentAction } from '@shared/api/actions';
 import { DealershipSchema, type Dealership } from '@shared/api/dealerships';
 import {
   AGING_THRESHOLD_DAYS,
+  FacetsResponseSchema,
   PAGE_SIZE_DEFAULT,
   VehicleListItemSchema,
   VehicleListResponseSchema,
+  type FacetsResponse,
   type VehicleListItem,
   type VehicleListResponse,
 } from '@shared/api/vehicles';
+import { foldAsciiCase } from '@/mocks/vehicle-query';
 
 /**
  * Deterministic API fixtures for MSW (tests, Storybook, VITE_USE_MOCKS). Every builder parses its
@@ -41,12 +44,18 @@ export function buildCurrentAction(overrides: Partial<CurrentAction> = {}): Curr
   });
 }
 
+/** Two models per make, so model options visibly depend on the make (BR-06). */
 const MODELS = [
   { make: 'Ford', model: 'Focus', trim: 'Titanium' },
   { make: 'Toyota', model: 'Corolla', trim: 'Design' },
   { make: 'BMW', model: '3 Series', trim: 'M Sport' },
   { make: 'Audi', model: 'A3', trim: 'Sport' },
   { make: 'Volkswagen', model: 'Golf', trim: 'Life' },
+  { make: 'Ford', model: 'Fiesta', trim: 'ST-Line' },
+  { make: 'Toyota', model: 'Yaris', trim: 'Icon' },
+  { make: 'BMW', model: 'X1', trim: 'Sport' },
+  { make: 'Audi', model: 'Q3', trim: 'S line' },
+  { make: 'Volkswagen', model: 'Polo', trim: 'Match' },
 ] as const;
 const COLOURS = ['Black', 'White', 'Silver', 'Blue', 'Red'] as const;
 
@@ -112,6 +121,29 @@ export function buildVehiclePage(
     total: all.length,
     page,
     pageSize,
+  });
+}
+
+const byText = (a: string, b: string) => {
+  // ASCII case-insensitive, like the API's COLLATE NOCASE (TA-27); exact text breaks ties.
+  const [x, y] = [foldAsciiCase(a), foldAsciiCase(b)];
+  if (x !== y) return x < y ? -1 : 1;
+  return a < b ? -1 : a > b ? 1 : 0;
+};
+
+/** Distinct makes A-Z, each with its distinct models A-Z, as GET .../facets returns (BR-06). */
+export function buildFacets(vehicles: VehicleListItem[]): FacetsResponse {
+  const models = new Map<string, Set<string>>();
+  for (const v of vehicles) {
+    const set = models.get(v.make) ?? new Set<string>();
+    set.add(v.model);
+    models.set(v.make, set);
+  }
+  return FacetsResponseSchema.parse({
+    makes: [...models.keys()].sort(byText).map((make) => ({
+      make,
+      models: [...(models.get(make) ?? [])].sort(byText),
+    })),
   });
 }
 

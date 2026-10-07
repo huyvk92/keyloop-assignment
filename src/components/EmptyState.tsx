@@ -4,13 +4,25 @@ import { cn } from '@/lib/cn';
 type Props = Omit<ComponentProps<'div'>, 'title'> & {
   title: string;
   description?: string;
+  /**
+   * Announce the message as a status (default). Pass `false` when another live region already
+   * announces the same outcome, so it isn't read twice.
+   */
+  announce?: boolean;
 };
 
 /** Message shown when a list has no items; `children` is an optional action slot. */
-export function EmptyState({ title, description, className, children, ...props }: Props) {
+export function EmptyState({
+  title,
+  description,
+  announce = true,
+  className,
+  children,
+  ...props
+}: Props) {
   return (
     <div
-      role="status"
+      role={announce ? 'status' : undefined}
       className={cn(
         'flex flex-col items-center gap-2 rounded-lg border border-dashed border-slate-300 p-8 text-center',
         className,

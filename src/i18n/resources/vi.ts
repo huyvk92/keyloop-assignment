@@ -79,6 +79,50 @@ export const vi = {
         title: 'Không có xe tồn kho',
         description: '{{dealership}} hiện không có xe nào trong kho.',
       },
+      noMatch: {
+        title: 'Không có xe nào khớp với bộ lọc',
+        description: 'Hãy thay đổi hoặc xóa bộ lọc.',
+        clear: 'Xóa bộ lọc',
+      },
+    },
+    filters: {
+      label: 'Lọc xe',
+      search: {
+        label: 'Tìm kiếm',
+        hint: 'Số VIN, mã tồn kho hoặc mẫu xe',
+      },
+      make: { label: 'Hãng xe', all: 'Tất cả hãng xe' },
+      model: { label: 'Mẫu xe', all: 'Tất cả mẫu xe' },
+      facets: {
+        error: 'Không thể tải danh sách hãng xe và mẫu xe.',
+      },
+      ageBucket: {
+        label: 'Số ngày tồn kho',
+        all: 'Tất cả',
+        options: {
+          '0-30': '0-30 ngày',
+          '31-60': '31-60 ngày',
+          '61-90': '61-90 ngày',
+          'over-90': 'Trên 90 ngày',
+        },
+      },
+      agingOnly: 'Chỉ xe tồn kho lâu (trên 90 ngày)',
+      ageRange: {
+        legend: 'Khoảng số ngày tùy chọn',
+        min: 'Số ngày tối thiểu',
+        max: 'Số ngày tối đa',
+        apply: 'Áp dụng khoảng',
+        errors: {
+          order: 'Số ngày tối thiểu phải nhỏ hơn hoặc bằng số ngày tối đa.',
+          invalid: 'Nhập số ngày nguyên từ 0 đến {{max}}.',
+        },
+      },
+      matchCount: {
+        filtered_one: '{{total}} xe khớp với bộ lọc',
+        filtered_other: '{{total}} xe khớp với bộ lọc',
+        all_one: '{{total}} xe trong kho',
+        all_other: '{{total}} xe trong kho',
+      },
     },
     table: {
       caption: 'Xe tồn kho tại {{dealership}}',

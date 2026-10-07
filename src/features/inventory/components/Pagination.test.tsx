@@ -5,12 +5,14 @@ import { Pagination } from '@/features/inventory';
 import { i18n } from '@/i18n';
 
 describe('Pagination', () => {
-  it('summarises the visible range in a live region inside a labelled nav', () => {
+  it('summarises the visible range inside a labelled nav, without a live region', () => {
     render(<Pagination page={2} pageSize={25} total={312} onPageChange={vi.fn()} />);
 
     const nav = screen.getByRole('navigation', { name: 'Pagination' });
     expect(nav).toHaveTextContent('Showing 26-50 of 312');
-    expect(screen.getByText('Showing 26-50 of 312')).toHaveAttribute('aria-live', 'polite');
+    // The filter bar's match count announces result changes; this text is read on demand.
+    expect(within(nav).getByText('Showing 26-50 of 312')).not.toHaveAttribute('aria-live');
+    expect(within(nav).queryByRole('status')).not.toBeInTheDocument();
     expect(nav).toHaveTextContent('Page 2 of 13');
   });
 
@@ -76,7 +78,7 @@ describe('Pagination', () => {
     render(<Pagination page={2} pageSize={25} total={1200} onPageChange={vi.fn()} />);
 
     const nav = screen.getByRole('navigation', { name: 'Phân trang' });
-    expect(within(nav).getByText('Hiển thị 26-50 / 1.200')).toHaveAttribute('aria-live', 'polite');
+    expect(within(nav).getByText('Hiển thị 26-50 / 1.200')).toBeVisible();
     expect(nav).toHaveTextContent('Trang 2 / 48');
     expect(screen.getByRole('button', { name: 'Trang trước' })).toHaveTextContent('Trước');
     expect(screen.getByRole('button', { name: 'Trang sau' })).toHaveTextContent('Sau');

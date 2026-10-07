@@ -15,7 +15,11 @@ type Props = {
  */
 const unavailable = 'aria-disabled:cursor-not-allowed aria-disabled:opacity-50';
 
-/** Previous/next paging with a live "Showing 26-50 of 312" summary (AC-001.4, TRD section 6). */
+/**
+ * Previous/next paging with a "Showing 26-50 of 312" summary (AC-001.4). The summary is plain
+ * text, not a live region: the filter bar's match count is the single announcer of result
+ * changes, so one change is not announced two or three times.
+ */
 export function Pagination({ page, pageSize, total, onPageChange }: Props) {
   const { t } = useTranslation();
   const { integer } = useFormatters();
@@ -30,7 +34,7 @@ export function Pagination({ page, pageSize, total, onPageChange }: Props) {
       aria-label={t('inventory.pagination.label')}
       className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-700"
     >
-      <p aria-live="polite">
+      <p>
         {t('inventory.pagination.summary', {
           from: integer(from),
           to: integer(to),

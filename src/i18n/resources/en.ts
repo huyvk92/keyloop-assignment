@@ -79,6 +79,54 @@ export const en = {
         title: 'No vehicles in stock',
         description: '{{dealership}} has no vehicles in stock right now.',
       },
+      /** Filters are active but nothing matches (AC-002.8); differs from "No vehicles in stock". */
+      noMatch: {
+        title: 'No vehicles match your filters',
+        description: 'Try changing or clearing the filters.',
+        clear: 'Clear filters',
+      },
+    },
+    /** FilterBar and AgeRangeFilter (US-002). Filter values (make, model) are data, never translated. */
+    filters: {
+      label: 'Filter vehicles',
+      search: {
+        label: 'Search',
+        hint: 'VIN, stock number or model',
+      },
+      make: { label: 'Make', all: 'All makes' },
+      model: { label: 'Model', all: 'All models' },
+      facets: {
+        error: "Couldn't load the make and model options.",
+      },
+      ageBucket: {
+        label: 'Days in stock',
+        all: 'Any age',
+        options: {
+          '0-30': '0-30 days',
+          '31-60': '31-60 days',
+          '61-90': '61-90 days',
+          'over-90': 'Over 90 days',
+        },
+      },
+      agingOnly: 'Aging only (over 90 days)',
+      ageRange: {
+        legend: 'Custom age range (days)',
+        min: 'Minimum days',
+        max: 'Maximum days',
+        apply: 'Apply range',
+        errors: {
+          /** Shown instead of the contract's English AGE_RANGE_ERROR_MESSAGE (BR-07). */
+          order: 'Minimum days must be less than or equal to maximum days.',
+          invalid: 'Enter a whole number of days from 0 to {{max}}.',
+        },
+      },
+      /** Polite live count of the settled result (AC-002.1); `total` is the formatted count. */
+      matchCount: {
+        filtered_one: '{{total}} vehicle matches your filters',
+        filtered_other: '{{total}} vehicles match your filters',
+        all_one: '{{total}} vehicle in stock',
+        all_other: '{{total}} vehicles in stock',
+      },
     },
     table: {
       caption: 'Vehicles in stock at {{dealership}}',

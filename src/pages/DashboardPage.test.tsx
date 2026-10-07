@@ -31,10 +31,49 @@ describe('DashboardPage', () => {
     await act(() => router.navigate('/dealerships/4'));
 
     expect(await screen.findByRole('heading', { level: 1, name: 'York' })).toBeVisible();
-    expect(await screen.findByRole('status')).toHaveTextContent('Loading vehicles…');
+    // The match count is a second status region; the list's loading status is the one asserted.
+    expect(await screen.findByText('Loading vehicles…')).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(screen.queryByText('STK-1001')).not.toBeInTheDocument();
     expect(screen.queryByText('Showing 1-25 of 30')).not.toBeInTheDocument();
+  });
+
+  it('canonicalises a dirty URL with exactly one replace navigation (TA-09)', async () => {
+    const { router } = renderRoutes(routes, {
+      route: '/dealerships/1?make=Ford&pageSize=999&page=1&bogus=1',
+    });
+    const navigate = vi.spyOn(router, 'navigate');
+
+    expect(await screen.findByText('6 vehicles match your filters')).toBeVisible();
+
+    expect(router.state.location.search).toBe('?make=Ford');
+    expect(router.state.historyAction).toBe('REPLACE');
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate.mock.calls[0]?.[1]).toMatchObject({ replace: true });
+  });
+
+  it('opens a shared ?sort=price&order=desc link with that sort applied (AC-011.3)', async () => {
+    const listRequests: URLSearchParams[] = [];
+    server.use(
+      http.get(apiUrl('/dealerships/:dealershipId/vehicles'), ({ request }) => {
+        listRequests.push(new URL(request.url).searchParams);
+      }),
+    );
+    const { router } = renderRoutes(routes, { route: '/dealerships/1?sort=price&order=desc' });
+
+    const table = await screen.findByRole('table', { name: 'Vehicles in stock at Birmingham' });
+    expect(router.state.location.search).toBe('?sort=price&order=desc');
+    expect(listRequests.at(-1)?.get('sort')).toBe('price');
+    expect(listRequests.at(-1)?.get('order')).toBe('desc');
+    const prices = within(table)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) =>
+        Number(within(row).getAllByRole('cell')[7]?.textContent?.replace(/[^\d]/g, '')),
+      );
+    expect(prices).toHaveLength(25);
+    expect(prices).toEqual([...prices].sort((a, b) => b - a));
+    expect(new Set(prices).size).toBeGreaterThan(1);
   });
 
   it.each(['/dealerships/99', '/dealerships/abc'])(
@@ -117,6 +156,37 @@ describe('DashboardPage', () => {
       // A keyboard user changing the select keeps their place (no jump to the h1).
       expect(screen.getByRole('combobox', { name: 'Dealership' })).toHaveFocus();
       expect(screen.getByRole('combobox', { name: 'Dealership' })).toHaveDisplayValue('Leeds');
+    });
+
+    it('resets every filter control when switching dealership (AC-008.2, TA-10)', async () => {
+      const { user, router } = renderRoutes(routes, {
+        route: '/dealerships/1?make=Ford&agingOnly=true&q=stk&minAge=10',
+      });
+      expect(await screen.findByText('3 vehicles match your filters')).toBeVisible();
+      expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('stk');
+
+      await user.selectOptions(screen.getByRole('combobox', { name: 'Dealership' }), 'Leeds');
+
+      expect(await screen.findByText('4 vehicles in stock')).toBeVisible();
+      expect(router.state.location.search).toBe('');
+      expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('');
+      expect(screen.getByRole('combobox', { name: 'Make' })).toHaveDisplayValue('All makes');
+      expect(screen.getByRole('checkbox', { name: 'Aging only (over 90 days)' })).not.toBeChecked();
+      expect(screen.getByRole('textbox', { name: 'Minimum days' })).toHaveValue('');
+    });
+
+    it('restores filters and results from the URL on reload (AC-002.7)', async () => {
+      const url = '/dealerships/1?make=Ford&ageBucket=over-90';
+      const { unmount } = renderRoutes(routes, { route: url });
+      expect(await screen.findByText('3 vehicles match your filters')).toBeVisible();
+      const rows = screen.getAllByRole('row').map((row) => row.textContent);
+      unmount();
+
+      renderRoutes(routes, { route: url });
+
+      expect(await screen.findByText('3 vehicles match your filters')).toBeVisible();
+      expect(screen.getAllByRole('row').map((row) => row.textContent)).toEqual(rows);
+      expect(screen.getByRole('combobox', { name: 'Make' })).toHaveDisplayValue('Ford');
     });
 
     it('returns to the previous dealership and its filters with Back, focusing the h1', async () => {
