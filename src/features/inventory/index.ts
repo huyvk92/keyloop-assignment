@@ -20,3 +20,4 @@ export { Pagination } from './components/Pagination';
 export { VehicleTable } from './components/VehicleTable';
 export { useCanonicalSearch } from './hooks/useCanonicalSearch';
 export { useInventorySearchParams } from './hooks/useInventorySearchParams';
+export { LIST_REGION_ID } from './lib/search-params';

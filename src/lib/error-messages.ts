@@ -1,3 +1,4 @@
+import { AGING_THRESHOLD_DAYS } from '@shared/api/vehicles';
 import type { TFunction } from 'i18next';
 import type { en } from '@/i18n/resources/en';
 import { HttpError } from '@/lib/http';
@@ -37,5 +38,6 @@ export function getErrorMessageKey(error: unknown): ErrorMessageKey {
 
 /** The user-friendly message in the language of `t` (from `useTranslation()`). */
 export function getErrorMessage(error: unknown, t: TFunction): string {
-  return t(getErrorMessageKey(error));
+  // `days` feeds the VEHICLE_NOT_AGING text so the threshold isn't hard-coded in translations.
+  return t(getErrorMessageKey(error), { days: AGING_THRESHOLD_DAYS });
 }

@@ -12,7 +12,7 @@ import { AgingList } from './AgingList';
 
 type Props = {
   dealershipId: number;
-  /** Opens a vehicle (AC-004.4). Items are plain text until it is given (T-030). */
+  /** Opens a vehicle (AC-004.4); without it the items are plain text. */
   onSelectVehicle?: (vehicleId: number) => void;
 };
 

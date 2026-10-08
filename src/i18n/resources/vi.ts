@@ -23,6 +23,7 @@ export const vi = {
     loading: 'Đang tải…',
     retry: 'Thử lại',
     backHome: 'Về trang chủ',
+    close: 'Đóng',
   },
   errors: {
     boundary: {
@@ -42,7 +43,7 @@ export const vi = {
       defaultTitle: 'Không thể tải dữ liệu',
     },
     messages: {
-      vehicleNotAging: 'Chỉ có thể ghi nhận hành động cho xe tồn kho trên 90 ngày.',
+      vehicleNotAging: 'Chỉ có thể ghi nhận hành động cho xe tồn kho trên {{days}} ngày.',
       validation: 'Một số trường không hợp lệ.',
       notFound: 'Không tìm thấy nội dung bạn cần. Có thể nội dung này đã bị xóa.',
       network: 'Không thể kết nối với máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.',
@@ -155,7 +156,10 @@ export const vi = {
       notAging: 'Chưa tồn kho lâu',
       noAction: 'Chưa có hành động',
       actionMeta: '{{loggedBy}} · {{loggedAt}}',
+      view: 'Xem',
+      viewLabel: 'Xem {{stockNumber}}',
       header: {
+        details: 'Chi tiết',
         stockNumber: 'Mã tồn kho',
         make: 'Hãng xe',
         model: 'Mẫu xe',
@@ -179,6 +183,48 @@ export const vi = {
       previousLabel: 'Trang trước',
       next: 'Sau',
       nextLabel: 'Trang sau',
+    },
+  },
+  vehicleActions: {
+    dialog: {
+      fallbackTitle: 'Chi tiết xe',
+      title: '{{stockNumber}} · {{make}} {{model}}',
+      loading: 'Đang tải chi tiết xe…',
+      loadError: 'Không thể tải thông tin xe này',
+      refreshFailed: 'Không thể làm mới thông tin xe. Đang hiển thị dữ liệu tải gần nhất.',
+    },
+    facts: {
+      days_one: '{{days}} ngày',
+      days_other: '{{days}} ngày',
+    },
+    history: {
+      title: 'Lịch sử hành động',
+      label: 'Lịch sử hành động, mới nhất trước',
+      empty: 'Chưa có hành động nào được ghi nhận cho xe này.',
+      loggedBy: 'Người ghi nhận: {{name}}',
+    },
+    form: {
+      title: 'Ghi nhận hành động',
+      status: 'Trạng thái hành động',
+      note: {
+        label: 'Ghi chú (không bắt buộc)',
+        hint: 'Tối đa {{max}} ký tự.',
+        counter: '{{length}} / {{max}}',
+      },
+      loggedBy: 'Người ghi nhận',
+      submit: 'Lưu hành động',
+      submitting: 'Đang lưu…',
+      saved: 'Đã lưu hành động',
+      saveError: 'Không thể lưu hành động',
+      notAging:
+        'Chỉ có thể ghi nhận hành động cho xe tồn kho trên {{days}} ngày. Lịch sử bên dưới vẫn được hiển thị.',
+      errors: {
+        statusRequired: 'Vui lòng chọn trạng thái hành động.',
+        noteTooLong: 'Ghi chú không được vượt quá {{max}} ký tự.',
+        loggedByRequired: 'Vui lòng nhập tên của bạn.',
+        loggedByTooLong: 'Tên không được vượt quá {{max}} ký tự.',
+        invalid: 'Vui lòng kiểm tra lại trường này.',
+      },
     },
   },
   actionStatus: {

@@ -5,7 +5,7 @@ import { useFormatters } from '@/lib/use-formatters';
 
 type Props = {
   vehicles: VehicleListItem[];
-  /** Makes each item a button; omitted until the vehicle dialog exists (T-030), so no dead buttons. */
+  /** Makes each item a button that opens the vehicle (AC-004.4); without it items are plain text. */
   onSelectVehicle?: (vehicleId: number) => void;
 };
 

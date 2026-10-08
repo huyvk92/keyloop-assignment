@@ -1,6 +1,6 @@
 import preview from '#.storybook/preview';
 import { delay, http, HttpResponse } from 'msw';
-import { expect } from 'storybook/test';
+import { expect, fn } from 'storybook/test';
 import { apiUrl } from '@/lib/http';
 import { fixtureDealerships } from '@/mocks/fixtures';
 import { VehicleTable } from './VehicleTable';
@@ -54,5 +54,14 @@ export const LoadError = meta.story({
   },
   play: async ({ canvas }) => {
     await expect(await canvas.findByRole('alert')).toHaveTextContent("Couldn't load vehicles");
+  },
+});
+
+/** With a handler, each row starts with a "View <stock number>" button (AC-004.4, T-030). */
+export const Selectable = meta.story({
+  args: { onSelectVehicle: fn() },
+  play: async ({ canvas, userEvent, args }) => {
+    await userEvent.click(await canvas.findByRole('button', { name: 'View STK-1001' }));
+    await expect(args.onSelectVehicle).toHaveBeenCalledWith(1);
   },
 });

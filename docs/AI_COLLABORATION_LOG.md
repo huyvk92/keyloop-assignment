@@ -381,3 +381,105 @@ Scaffold (`/init-react-app`) -> TDD implementation (`/implement-trd`) -> Review 
     isolated perf 7 (worst cold 74 ms against a 750 ms budget).
   - AC-005.4 screenshots committed to `docs/screenshots/` (EN and VI, real API, KPI bottom at
     y=239 of 800).
+
+### 2026-10-08 · implement-trd phase 4, wave 1 web (T-029 Dialog)
+
+- **AI output**: `Dialog` built on native `<dialog>` with `showModal()`.
+  - It is a controlled component: Escape is handled through a preventable `cancel` event, with a
+    native-`close` fallback.
+  - On open, focus moves to the heading; on close it returns to the trigger, or stays on body if
+    the trigger is gone.
+  - A backdrop click closes it only when the press also started on the backdrop.
+  - There is a body scroll lock and a minimal jsdom stub (jsdom 29 lacks `showModal`/`close`).
+  - The agent mutation-checked its own tests. Removing `onCancel` initially failed nothing, so it
+    added a controlled-case test that now catches it.
+- **My mistake caught by the agent**: my brief described a centred dialog, but ADR-006 in the TRD
+  says a right-side drawer at md+. The agent flagged the conflict instead of picking silently.
+- **Human decision (mine)**: keep ADR-006. The drawer keeps the list in view while a manager
+  reviews and logs an action, and suits a long history. The mistake was in my brief, so the ADR
+  stays as written. The class change is part of wave 2.
+
+### 2026-10-08 · implement-trd phase 4 (log and persist actions: T-025..T-032)
+
+- **Scope**: The brief's core requirement 3, "log and persist a status or proposed action for
+  each aging vehicle".
+- **Waves**:
+  - Wave 1 ran in parallel:
+    - Backend: contract, `GET /vehicles/:id` with history, `POST /vehicles/:id/actions`, the
+      restart persistence test, MSW handlers, and a 27-row `actions.cases.ts` parity table run
+      against the real API and the mock.
+    - Web: the native `<dialog>` component.
+  - Wave 2 (web): the detail drawer and history, the log form, and the save mutation.
+- **My verification of wave 1 (real API, file DB, real restart)**:
+  - A POST to the 90-day STK-1045 returned 422 and stored 0 actions. A POST to the 91-day
+    STK-1178 returned 201, with the note and name trimmed. A 501-char note returned 400.
+  - After a process restart, the action was still the current action and `needsAttention` was
+    false.
+  - I read the service: it reuses the list's `getVehicle` for aging, and has no `await` between
+    the check and the insert.
+- **My verification of wave 2 (real Chrome via puppeteer-core, real API, file DB, restart)**:
+  - Opening "No action" STK-1223 from the aging section showed a right-side drawer (left=704,
+    576x800) with focus on the heading. axe found 0 violations with the drawer open.
+  - An empty submit showed both field errors and moved focus to the first status radio.
+  - Saving "Price Reduction Planned" with the note `<b>cut</b> by 5%`:
+    - The history shows the note as literal text; no `<b>` element is rendered.
+    - The aging-section row updated without a reload.
+    - The summary's `needsAttentionCount` went from 46 to 45.
+  - Escape returned focus to the trigger. A 90-day vehicle shows no form.
+  - Vietnamese shows "Vui lòng nhập tên của bạn." and "Dự kiến giảm giá 07/10/2026 13:00".
+  - After a dev-server restart on the same DB file, the action and its note were still there.
+  - Screenshots are in `docs/screenshots/vehicle-drawer-*.png`.
+- **Mistake of mine caught by an agent**: my wave-1 brief said "centred dialog", contradicting
+  ADR-006 (drawer). The agent flagged it. I kept the ADR and fixed it in wave 2.
+- **Agent self-checks**:
+  - The backend mutation-checked its tests: treating 90 days as aging made 5 tests fail;
+    removing the blank-note-to-null rule made 6 fail.
+  - The Dialog agent added a controlled-case test after finding that removing `onCancel` broke
+    nothing.
+  - The web agent rewrote a racy double-submit test so it holds the POST open deterministically.
+- **End-of-phase review**:
+  - The code reviewer APPROVED with 0 BLOCKER/MAJOR findings and 6 MINOR ones:
+    - the character counter used UTF-16 units, so 300 emoji showed "600 / 500" in red but saved;
+    - Save is `disabled` while saving, so Chromium blurs it and keyboard focus is lost;
+    - the dialog had no focus fallback when the trigger disappears (a row leaves a
+      needs-attention view after logging);
+    - the restart test skipped `seedIfEmpty`;
+    - malformed JSON returned `FST_ERR_CTP_*` instead of `VALIDATION_ERROR`;
+    - mock parity bypassed the MSW handler.
+  - The test engineer found every ID covered, 4 of them only partially. AC-007.2 (another
+    browser or session) was proven only "by design", and there was no web reload test for
+    AC-007.1.
+  - One full-suite timeout was traced to the Mac sleeping mid-run (power log). The tester also
+    found that a timed-out test keeps running and can break the next test's form; the fix is to
+    scope queries with `within(dialog)`.
+- **Decision**: Fix all 6 MINOR findings, the partial ACs, and most NITs in one round. Two agents
+  work on disjoint files:
+  - Backend: restart with seeding, an explicit two-instance test for AC-007.2, the
+    malformed-JSON mapping, parity through the MSW handler, extra parity rows, and BR-12
+    hardening against zero-width names.
+  - Web: code-point counter, focusable Save, focus fallback, split load-sensitive test, web
+    reload test, Vietnamese submit/messages, and the remaining test gaps.
+- **Fix-round outcome (verified by me)**:
+  - Backend:
+    - The restart test now runs the real startup steps, including seeding. The second start
+      reports seeded = [] and all row counts match.
+    - AC-007.2 is proven by two server instances on one DB file: a write through A is visible
+      through B in the detail, the list and the summary.
+    - Body-parse errors return 400 `VALIDATION_ERROR`.
+    - The parity table grew from 27 to 46 rows and now runs through the real MSW handler.
+    - TA-30 defines blank text, so zero-width names are rejected.
+  - Web:
+    - The character counter counts code points (300 emoji shows "300 / 500").
+    - Save stays focusable via `aria-disabled`, and an error moves focus to the alert.
+    - The Dialog has a `returnFocusFallback`, and the load-sensitive test is split and scoped.
+    - New tests cover a web reload, a Vietnamese submit with a canonical body, and inputs kept
+      on 422 and on network errors.
+  - My own fix: the `VEHICLE_NOT_AGING` message hard-coded "90". It now interpolates
+    `{{days}}` from `AGING_THRESHOLD_DAYS`. My edit first failed `format:check`, which I fixed.
+  - The web agent's `validate` failed only with Vitest workers that would not start, while the
+    machine's load average was about 45 (Safari WebContent at 100-170% CPU). My rerun passed
+    (exit 0): web 615, API 369, perf 7. Load reached 170 by the end of the run.
+  - Real Chrome focus check:
+    - Enter on Save keeps focus on Save while saving and after saving.
+    - With `?needsAttention=true`, the logged row leaves the list. Escape then sends focus to
+      `#inventory-list` "Vehicle list", not body.

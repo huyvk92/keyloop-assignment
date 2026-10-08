@@ -22,6 +22,8 @@ export const en = {
     loading: 'Loading…',
     retry: 'Retry',
     backHome: 'Back to home',
+    /** Accessible name of the dialog's close button (T-029). */
+    close: 'Close',
   },
   errors: {
     boundary: {
@@ -42,7 +44,8 @@ export const en = {
     },
     /** Mapped from HttpError codes and statuses; raw server text is never shown (TRD section 6). */
     messages: {
-      vehicleNotAging: 'Actions can only be logged for vehicles in stock for more than 90 days.',
+      vehicleNotAging:
+        'Actions can only be logged for vehicles in stock for more than {{days}} days.',
       validation: 'Some fields are invalid.',
       notFound: "We couldn't find what you were looking for. It may have been removed.",
       network: "Couldn't reach the server. Check your connection and try again.",
@@ -169,7 +172,13 @@ export const en = {
       noAction: 'No action',
       /** "Jane Smith · 07 Oct 2026, 14:32": logged-by name (data) and formatted timestamp. */
       actionMeta: '{{loggedBy}} · {{loggedAt}}',
+      /** Visible text of the per-row button that opens the vehicle (AC-004.4, T-030). */
+      view: 'View',
+      /** Its accessible name; starts with the visible text (WCAG 2.5.3). */
+      viewLabel: 'View {{stockNumber}}',
       header: {
+        /** Only shown when rows can be opened (the "View" column). */
+        details: 'Details',
         stockNumber: 'Stock no.',
         make: 'Make',
         model: 'Model',
@@ -193,6 +202,60 @@ export const en = {
       previousLabel: 'Previous page',
       next: 'Next',
       nextLabel: 'Next page',
+    },
+  },
+  /** Vehicle detail drawer, action history and the "Log action" form (US-006, US-007). */
+  vehicleActions: {
+    dialog: {
+      /** Dialog title until the vehicle has loaded. */
+      fallbackTitle: 'Vehicle details',
+      /** "STK-1042 · Ford Focus"; vehicle data is shown as stored. */
+      title: '{{stockNumber}} · {{make}} {{model}}',
+      loading: 'Loading vehicle details…',
+      loadError: "Couldn't load this vehicle",
+      /** Quiet hint (not a live region) when a background refresh fails; last details stay. */
+      refreshFailed: "Couldn't refresh this vehicle. Showing the last loaded details.",
+    },
+    facts: {
+      /** `days` is the formatted day count. */
+      days_one: '{{days}} day',
+      days_other: '{{days}} days',
+    },
+    history: {
+      title: 'Action history',
+      label: 'Action history, newest first',
+      empty: 'No actions have been logged for this vehicle yet.',
+      /** "Logged by Jane Smith"; the name is data, never translated. */
+      loggedBy: 'Logged by {{name}}',
+    },
+    form: {
+      title: 'Log action',
+      status: 'Action status',
+      note: {
+        label: 'Note (optional)',
+        hint: 'Up to {{max}} characters.',
+        /** Live character count of the trimmed note: "12 / 500". */
+        counter: '{{length}} / {{max}}',
+      },
+      loggedBy: 'Logged by',
+      submit: 'Save action',
+      submitting: 'Saving…',
+      saved: 'Action saved',
+      saveError: "Couldn't save the action",
+      /**
+       * Shown instead of the form for a vehicle that isn't aging (AC-006.2, BR-09). `days` is the
+       * formatted AGING_THRESHOLD_DAYS.
+       */
+      notAging:
+        'Actions can only be logged for vehicles in stock for more than {{days}} days. The history below stays available.',
+      /** Mapped from the field and the Zod issue code; the contract's English message is never shown. */
+      errors: {
+        statusRequired: 'Select an action status.',
+        noteTooLong: 'Note must be {{max}} characters or fewer.',
+        loggedByRequired: 'Enter your name.',
+        loggedByTooLong: 'Name must be {{max}} characters or fewer.',
+        invalid: 'Check this field.',
+      },
     },
   },
   /**

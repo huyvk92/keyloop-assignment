@@ -9,10 +9,14 @@ import {
   AgingSection,
   FilterBar,
   KpiCards,
+  LIST_REGION_ID,
   useCanonicalSearch,
   VehicleTable,
 } from '@/features/inventory';
+import { useVehicleSelection, VehicleDetailDialog } from '@/features/vehicle-actions';
 import { shouldKeepFocus } from '@/lib/navigation-focus';
+
+const listRegion = () => document.getElementById(LIST_REGION_ID);
 
 /** `/dealerships/:dealershipId`: the dealership comes from the path (ADR-008, AC-008.3). */
 export function DashboardPage() {
@@ -24,6 +28,8 @@ export function DashboardPage() {
   const keepFocus = shouldKeepFocus(useLocation().state);
   // The one owner of URL clean-up for the filters and the list (TA-09).
   useCanonicalSearch();
+  // The open vehicle drawer is local page state, dropped on a dealership switch (TA-16).
+  const { selectedVehicleId, selectVehicle, clearSelection } = useVehicleSelection(dealershipId);
 
   if (isPending) {
     return (
@@ -63,13 +69,19 @@ export function DashboardPage() {
       actions={<DealershipSelector dealershipId={dealership.id} />}
     >
       {/* Page order: KPIs → aging section → filters + list, so the summary is visible without
-          scrolling at 1280x800 and the aging stock follows (AC-005.4, AC-004.1).
-          No onSelectVehicle until the dialog exists (T-030). */}
+          scrolling at 1280x800 and the aging stock follows (AC-005.4, AC-004.1). */}
       <KpiCards dealershipId={dealership.id} />
-      <AgingSection dealershipId={dealership.id} />
+      <AgingSection dealershipId={dealership.id} onSelectVehicle={selectVehicle} />
       {/* Keyed by dealership: a switch drops the search draft and any pending debounce (TA-10). */}
       <FilterBar key={dealership.id} dealershipId={dealership.id} />
-      <VehicleTable dealership={dealership} />
+      <VehicleTable dealership={dealership} onSelectVehicle={selectVehicle} />
+      {/* If the opening row is gone on close (e.g. a saved action took the vehicle out of a
+          "Needs attention" list), focus goes to the list region it was in (ADR-006). */}
+      <VehicleDetailDialog
+        vehicleId={selectedVehicleId}
+        onClose={clearSelection}
+        returnFocusFallback={listRegion}
+      />
     </PageSection>
   );
 }

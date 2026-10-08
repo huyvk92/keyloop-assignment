@@ -1,4 +1,5 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
+import type { UserEvent } from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { routes } from '@/app/router';
 import { createI18n, i18n, LANGUAGE_STORAGE_KEY } from '@/i18n';
@@ -9,6 +10,24 @@ import { preloadRouteModules, renderRoutes } from '@/test/render';
 const AGING_SEARCH = '?agingOnly=true&sort=age&order=desc&pageSize=10';
 /** The aging section's request (TA-11), as opposed to the main list's. */
 const isAgingRequest = (url: URL) => url.search === AGING_SEARCH;
+
+/**
+ * Opens a vehicle with `trigger`, logs "Price Reduction Planned" / "Cut 5%" / "Jane" and waits for
+ * the confirmation. Short pasted values keep it fast under load, and every query is scoped to
+ * this test's dialog.
+ */
+async function logActionFrom(user: UserEvent, trigger: HTMLElement) {
+  await user.click(trigger);
+  const dialog = await screen.findByRole('dialog', { name: /STK-/ });
+  await user.click(within(dialog).getByRole('radio', { name: 'Price Reduction Planned' }));
+  await user.click(within(dialog).getByRole('textbox', { name: 'Note (optional)' }));
+  await user.paste('Cut 5%');
+  await user.click(within(dialog).getByRole('textbox', { name: 'Logged by' }));
+  await user.paste('Jane');
+  await user.click(within(dialog).getByRole('button', { name: 'Save action' }));
+  expect(await within(dialog).findByText('Action saved')).toBeVisible();
+  return dialog;
+}
 
 describe('DashboardPage', () => {
   beforeAll(preloadRouteModules);
@@ -375,6 +394,116 @@ describe('DashboardPage', () => {
       expect(await screen.findByText('Hiển thị 1-4 / 4')).toBeVisible();
       expect(screen.getByRole('combobox', { name: 'Ngôn ngữ' })).toHaveValue('vi');
       expect(document.documentElement.lang).toBe('vi');
+    });
+  });
+  describe('vehicle drawer (T-030, T-032)', () => {
+    it('opens a vehicle from its table row and returns focus to "View" on Escape (AC-004.4)', async () => {
+      const { user } = renderRoutes(routes, { route: '/dealerships/1' });
+      const view = await screen.findByRole('button', { name: 'View STK-1001' });
+
+      await user.click(view);
+
+      const dialog = await screen.findByRole('dialog', { name: 'STK-1001 · Toyota Corolla' });
+      expect(within(dialog).getByRole('heading', { name: 'Action history' })).toBeVisible();
+      await user.keyboard('{Escape}');
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(view).toHaveFocus();
+    });
+
+    it('opens a vehicle from the aging section (AC-004.4)', async () => {
+      const { user } = renderRoutes(routes, { route: '/dealerships/1' });
+      const aging = await screen.findByRole('list', { name: 'Aging vehicles, oldest first' });
+
+      await user.click(within(aging).getByRole('button', { name: /STK-1002/ }));
+
+      expect(await screen.findByRole('dialog', { name: /STK-1002/ })).toBeVisible();
+    });
+
+    it('updates the list row after logging, without a refresh (AC-006.3, AC-010.2)', async () => {
+      const { user } = renderRoutes(routes, { route: '/dealerships/1' });
+      const row = await screen.findByRole('row', { name: /STK-1002/ });
+      expect(within(row).getByText('No action')).toBeVisible();
+
+      await logActionFrom(user, within(row).getByRole('button', { name: 'View STK-1002' }));
+
+      await waitFor(() =>
+        expect(screen.getByRole('row', { name: /STK-1002/ })).toHaveTextContent(
+          'Price Reduction Planned',
+        ),
+      );
+    });
+
+    it('updates the aging section after logging, without a refresh (AC-010.2)', async () => {
+      const { user } = renderRoutes(routes, { route: '/dealerships/1' });
+      const aging = await screen.findByRole('list', { name: 'Aging vehicles, oldest first' });
+      const item = within(aging).getByRole('button', { name: /STK-1002/ });
+      expect(item).toHaveTextContent('No action');
+
+      await logActionFrom(user, item);
+
+      await waitFor(() =>
+        expect(within(aging).getByRole('button', { name: /STK-1002/ })).toHaveTextContent(
+          'Price Reduction Planned',
+        ),
+      );
+    });
+
+    it('moves focus to the list on close when the vehicle left a "needs attention" list (ADR-006)', async () => {
+      const { user } = renderRoutes(routes, { route: '/dealerships/1?needsAttention=true' });
+      const view = await screen.findByRole('button', { name: 'View STK-1002' });
+
+      await logActionFrom(user, view);
+      // With an action it no longer needs attention (BR-16): the refetched list drops its row.
+      await waitFor(() =>
+        expect(screen.queryByRole('row', { name: /STK-1002/ })).not.toBeInTheDocument(),
+      );
+      await user.keyboard('{Escape}');
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.getByRole('region', { name: 'Vehicle list' })).toHaveFocus();
+      expect(document.body).not.toHaveFocus();
+    });
+
+    it('still shows a logged action after a reload (AC-007.1)', async () => {
+      const view = renderRoutes(routes, { route: '/dealerships/1' });
+      await logActionFrom(view.user, await screen.findByRole('button', { name: 'View STK-1002' }));
+      view.unmount();
+
+      // A fresh QueryClient and router: everything comes from the (mock) API again.
+      const { user } = renderRoutes(routes, { route: '/dealerships/1' });
+      const row = await screen.findByRole('row', { name: /STK-1002/ });
+      expect(row).toHaveTextContent('Price Reduction Planned');
+      await user.click(within(row).getByRole('button', { name: 'View STK-1002' }));
+
+      const dialog = await screen.findByRole('dialog', { name: /STK-1002/ });
+      const list = await within(dialog).findByRole('list', {
+        name: 'Action history, newest first',
+      });
+      const [latest] = within(list).getAllByRole('listitem');
+      expect(latest).toHaveTextContent('Price Reduction Planned');
+      expect(latest).toHaveTextContent('Cut 5%');
+      expect(latest).toHaveTextContent('Logged by Jane');
+      // The current action is the first fact (`<dd>` = "definition").
+      expect(within(dialog).getAllByRole('definition')[0]).toHaveTextContent(
+        'Price Reduction Planned',
+      );
+    });
+
+    it('closes the drawer when the dealership changes, and keeps it closed on Back (BR-04, TA-16)', async () => {
+      const { user, router } = renderRoutes(routes, { route: '/dealerships/1' });
+      await user.click(await screen.findByRole('button', { name: 'View STK-1001' }));
+      await screen.findByRole('dialog', { name: /STK-1001/ });
+
+      await act(() => router.navigate('/dealerships/2'));
+
+      await screen.findByRole('heading', { level: 1, name: 'Leeds' });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(document.body).not.toHaveClass('overflow-hidden');
+
+      await act(() => router.navigate(-1));
+
+      await screen.findByRole('heading', { level: 1, name: 'Birmingham' });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
 });

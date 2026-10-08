@@ -111,7 +111,7 @@ describe('AgingSection', () => {
     expect(
       within(section()).getByRole('button', { name: 'View all 3 aging vehicles' }),
     ).toBeVisible();
-    // No vehicle dialog yet (T-030): items are not buttons unless a handler is given.
+    // Items are not buttons unless a handler is given.
     expect(within(list).queryByRole('button')).not.toBeInTheDocument();
   });
 

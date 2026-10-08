@@ -6,12 +6,15 @@ import { useTranslation } from 'react-i18next';
 import type { en } from '@/i18n/resources/en';
 import { cn } from '@/lib/cn';
 import { useFormatters, type Formatters } from '@/lib/use-formatters';
+import { Button } from '@/components/Button';
 import { AgingBadge } from './AgingBadge';
 
 type Props = {
   vehicles: VehicleListItem[];
   /** Supplies the currency for prices and the time zone for action timestamps. */
   dealership: Dealership;
+  /** Adds a leading "View <stock number>" button per row that opens the vehicle (T-030). */
+  onSelectVehicle?: (vehicleId: number) => void;
 };
 
 const cell = 'px-3 py-2 whitespace-nowrap';
@@ -84,12 +87,31 @@ const columns: Column[] = [
   { id: 'vin', className: 'font-mono text-xs', render: (v) => v.vin },
 ];
 
-/** Presentational inventory table: one row per vehicle, 13 columns (AC-001.1). */
-export function VehicleTableView({ vehicles, dealership }: Props) {
+/** The "View" column: a real button per row (rows themselves aren't clickable, TRD section 6). */
+const viewColumn = (onSelectVehicle: (vehicleId: number) => void): Column => ({
+  id: 'details',
+  render: (v, { t }) => (
+    <Button
+      variant="secondary"
+      size="sm"
+      aria-label={t('inventory.table.viewLabel', { stockNumber: v.stockNumber })}
+      onClick={() => onSelectVehicle(v.id)}
+    >
+      {t('inventory.table.view')}
+    </Button>
+  ),
+});
+
+/**
+ * Presentational inventory table: one row per vehicle, 13 data columns (AC-001.1), plus a leading
+ * "View" column when rows can be opened.
+ */
+export function VehicleTableView({ vehicles, dealership, onSelectVehicle }: Props) {
   const captionId = useId();
   const { t } = useTranslation();
   const format = useFormatters();
   const context: RenderContext = { dealership, t, format };
+  const shown = onSelectVehicle ? [viewColumn(onSelectVehicle), ...columns] : columns;
   return (
     // Focusable, labelled scroll container so keyboard users can scroll the table (NFR-07).
     <div
@@ -105,7 +127,7 @@ export function VehicleTableView({ vehicles, dealership }: Props) {
         </caption>
         <thead className="bg-slate-50 text-left text-xs font-semibold text-slate-700 uppercase">
           <tr>
-            {columns.map((column) => (
+            {shown.map((column) => (
               <th key={column.id} scope="col" className={cn(cell, column.className)}>
                 {t(`inventory.table.header.${column.id}`)}
               </th>
@@ -115,7 +137,7 @@ export function VehicleTableView({ vehicles, dealership }: Props) {
         <tbody className="divide-y divide-slate-100">
           {vehicles.map((v) => (
             <tr key={v.id} className="hover:bg-slate-50">
-              {columns.map((column) => (
+              {shown.map((column) => (
                 <td key={column.id} className={cn(cell, column.className)}>
                   {column.render(v, context)}
                 </td>

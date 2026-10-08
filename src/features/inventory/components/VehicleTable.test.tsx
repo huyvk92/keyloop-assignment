@@ -316,4 +316,34 @@ describe('VehicleTable', () => {
       expect(await screen.findByRole('status')).toHaveTextContent('Đang tải danh sách xe…');
     });
   });
+  it('adds a "View <stock number>" button per row when rows can be opened (AC-004.4)', async () => {
+    const vehicle = buildVehicle({ id: 42, stockNumber: 'STK-1042' });
+    server.use(http.get(vehiclesUrl(1), () => HttpResponse.json(buildVehiclePage([vehicle]))));
+    const onSelectVehicle = vi.fn();
+    const { user } = renderWithProviders(
+      <VehicleTable dealership={birmingham} onSelectVehicle={onSelectVehicle} />,
+      { route: '/dealerships/1', path: '/dealerships/:dealershipId' },
+    );
+
+    const table = await screen.findByRole('table', { name: 'Vehicles in stock at Birmingham' });
+    expect(within(table).getAllByRole('columnheader')[0]).toHaveTextContent('Details');
+    const view = within(table).getByRole('button', { name: 'View STK-1042' });
+    expect(view).toHaveTextContent('View');
+
+    await user.click(view);
+
+    expect(onSelectVehicle).toHaveBeenCalledExactlyOnceWith(42);
+  });
+
+  it('names the View button in Vietnamese', async () => {
+    await i18n.changeLanguage('vi');
+    const vehicle = buildVehicle({ id: 42, stockNumber: 'STK-1042' });
+    server.use(http.get(vehiclesUrl(1), () => HttpResponse.json(buildVehiclePage([vehicle]))));
+    renderWithProviders(<VehicleTable dealership={birmingham} onSelectVehicle={vi.fn()} />, {
+      route: '/dealerships/1',
+      path: '/dealerships/:dealershipId',
+    });
+
+    expect(await screen.findByRole('button', { name: 'Xem STK-1042' })).toHaveTextContent('Xem');
+  });
 });

@@ -1,4 +1,9 @@
-import { CurrentActionSchema, type CurrentAction } from '@shared/api/actions';
+import {
+  ActionEntrySchema,
+  CurrentActionSchema,
+  type ActionEntry,
+  type CurrentAction,
+} from '@shared/api/actions';
 import { DealershipSchema, type Dealership } from '@shared/api/dealerships';
 import {
   AGING_THRESHOLD_DAYS,
@@ -44,6 +49,41 @@ export function buildCurrentAction(overrides: Partial<CurrentAction> = {}): Curr
     loggedAt: '2026-10-07T09:00:00.000Z',
     ...overrides,
   });
+}
+
+/** One history entry (BR-13); defaults to an "Under Review" by Jane Smith at 09:00 UTC. */
+export function buildActionEntry(overrides: Partial<ActionEntry> = {}): ActionEntry {
+  return ActionEntrySchema.parse({
+    id: 1,
+    vehicleId: 1,
+    status: 'Under Review',
+    note: null,
+    loggedBy: 'Jane Smith',
+    loggedAt: '2026-10-07T09:00:00.000Z',
+    ...overrides,
+  });
+}
+
+/** The API's history order: `loggedAt` desc, then id desc for equal timestamps (BR-13, TA-13). */
+export function newestFirst(entries: readonly ActionEntry[]): ActionEntry[] {
+  return [...entries].sort((a, b) =>
+    a.loggedAt === b.loggedAt ? b.id - a.id : a.loggedAt < b.loggedAt ? 1 : -1,
+  );
+}
+
+/**
+ * `vehicle` with its current action and needs-attention flag re-derived from `history` (BR-14,
+ * BR-16), as the API derives them from the latest row. An empty history means "No action".
+ */
+export function withHistory(
+  vehicle: VehicleListItem,
+  history: readonly ActionEntry[],
+): VehicleListItem {
+  const latest = newestFirst(history)[0];
+  const currentAction = latest
+    ? { status: latest.status, loggedBy: latest.loggedBy, loggedAt: latest.loggedAt }
+    : null;
+  return { ...vehicle, currentAction, needsAttention: vehicle.isAging && currentAction === null };
 }
 
 /** Two models per make, so model options visibly depend on the make (BR-06). */
@@ -173,8 +213,57 @@ export const fixtureDealerships: Dealership[] = [
   buildDealership({ id: 4, name: 'York' }),
 ];
 
-export const fixtureVehicles: VehicleListItem[] = [
+const stock: VehicleListItem[] = [
   ...buildVehicles(30, { dealershipId: 1, startId: 1 }),
   ...buildVehicles(4, { dealershipId: 2, startId: 101, oldestAge: 120 }),
-  ...buildVehicles(2, { dealershipId: 3, startId: 201, oldestAge: 40 }),
+  // Vehicle 201 is 45 days old: non-aging, yet it has a history (AC-006.2, A-15).
+  ...buildVehicles(2, { dealershipId: 3, startId: 201, oldestAge: 45 }),
 ];
+
+/** Fixture vehicles with a hand-written history (TRD §4.5 seed highlights). */
+export const FIXTURE_HISTORY_VEHICLES = {
+  /** 09:00 "Under Review" then 11:00 "Marketing Promotion" (AC-007.4). */
+  twoEntries: 1,
+  /** A note with markup that must render as text (AC-006.8). */
+  markupNote: 4,
+  /** 45 days, not aging, one entry: history visible, no form (AC-006.2). */
+  nonAging: 201,
+} as const;
+
+const SPECIAL_HISTORY: Partial<Record<number, Omit<Partial<ActionEntry>, 'id' | 'vehicleId'>[]>> = {
+  [FIXTURE_HISTORY_VEHICLES.twoEntries]: [
+    { status: 'Under Review', loggedAt: '2026-10-07T09:00:00.000Z' },
+    {
+      status: 'Marketing Promotion',
+      note: 'Feature in the weekend email campaign',
+      loggedBy: 'Sam Patel',
+      loggedAt: '2026-10-07T11:00:00.000Z',
+    },
+  ],
+  [FIXTURE_HISTORY_VEHICLES.markupNote]: [{ status: 'Under Review', note: '<b>cut</b>' }],
+  [FIXTURE_HISTORY_VEHICLES.nonAging]: [
+    { status: 'Under Review', note: 'Checked on arrival', loggedAt: '2026-09-01T10:15:00.000Z' },
+  ],
+};
+
+/**
+ * The fixed history behind the fixtures: the hand-written entries above, plus one default entry
+ * (09:00 "Under Review") for every other vehicle `buildVehicles` gave a current action. Ids are
+ * sequential in stock order. Actions logged at runtime live in `src/mocks/action-store.ts`.
+ */
+export const fixtureActions: ActionEntry[] = stock
+  .flatMap((vehicle) =>
+    (SPECIAL_HISTORY[vehicle.id] ?? (vehicle.currentAction ? [{}] : [])).map((entry) => ({
+      vehicleId: vehicle.id,
+      ...entry,
+    })),
+  )
+  .map((entry, index) => buildActionEntry({ ...entry, id: index + 1 }));
+
+/** Every fixture vehicle, its current action derived from `fixtureActions` (BR-14). */
+export const fixtureVehicles: VehicleListItem[] = stock.map((vehicle) =>
+  withHistory(
+    vehicle,
+    fixtureActions.filter((entry) => entry.vehicleId === vehicle.id),
+  ),
+);

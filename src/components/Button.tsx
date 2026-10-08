@@ -1,4 +1,4 @@
-import type { ComponentProps } from 'react';
+import type { ComponentProps, MouseEvent } from 'react';
 import { cn } from '@/lib/cn';
 
 type Variant = 'primary' | 'secondary' | 'ghost';
@@ -18,6 +18,12 @@ const sizes = {
 type Props = ComponentProps<'button'> & {
   variant?: Variant;
   size?: Size;
+  /**
+   * Busy (e.g. saving): the button stays focusable but is `aria-disabled` and ignores clicks,
+   * including the click that submits a form. Unlike `disabled`, it doesn't drop keyboard focus to
+   * `<body>` (Chromium blurs a focused button when it becomes disabled). A form should still guard
+   * its own submit handler, since Enter in a field can submit without a click.
+   */
   isLoading?: boolean;
 };
 
@@ -25,25 +31,35 @@ export function Button({
   variant = 'primary',
   size = 'md',
   isLoading = false,
-  disabled,
   className,
   children,
   type = 'button',
+  onClick,
   ...props
 }: Props) {
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    if (isLoading) {
+      // Blocks the default action too, so a busy submit button doesn't submit its form again.
+      event.preventDefault();
+      return;
+    }
+    onClick?.(event);
+  };
   return (
     <button
       type={type}
-      disabled={disabled || isLoading}
+      aria-disabled={isLoading || undefined}
       aria-busy={isLoading || undefined}
       className={cn(
         'inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors',
         'focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:outline-none',
         'disabled:cursor-not-allowed disabled:opacity-50',
+        'aria-disabled:cursor-not-allowed aria-disabled:opacity-50',
         variants[variant],
         sizes[size],
         className,
       )}
+      onClick={handleClick}
       {...props}
     >
       {isLoading && (

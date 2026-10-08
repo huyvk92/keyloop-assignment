@@ -11,14 +11,18 @@ import { FILTER_REGION_ID } from '../lib/search-params';
 import { Pagination } from './Pagination';
 import { VehicleTableView } from './VehicleTableView';
 
-type Props = { dealership: Dealership };
+type Props = {
+  dealership: Dealership;
+  /** Opens a vehicle from its row's "View" button (AC-004.4). */
+  onSelectVehicle?: (vehicleId: number) => void;
+};
 
 /**
  * Paged inventory list for the filters in the URL, with loading, error (Retry), empty
  * ("No vehicles in stock" or "No vehicles match your filters") and success states
  * (AC-001.4..6, AC-002.8). Rendered inside `VehicleTable`'s focusable list region.
  */
-export function VehicleTableContent({ dealership }: Props) {
+export function VehicleTableContent({ dealership, onSelectVehicle }: Props) {
   const { t } = useTranslation();
   const { query, hasFilters, setPage, clearFilters, searchFor } = useInventorySearchParams(
     dealership.id,
@@ -82,7 +86,11 @@ export function VehicleTableContent({ dealership }: Props) {
 
   return (
     <div className="space-y-3">
-      <VehicleTableView vehicles={data.items} dealership={dealership} />
+      <VehicleTableView
+        vehicles={data.items}
+        dealership={dealership}
+        onSelectVehicle={onSelectVehicle}
+      />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Pagination
           page={data.page}
