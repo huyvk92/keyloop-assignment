@@ -772,6 +772,8 @@ PRD assumptions A-01..A-15 carry forward unchanged.
 | TA-28 | Search history: the first debounced search commit (empty to non-empty `q`) pushes a history entry; later commits while `q` stays non-empty replace it, so one Back leaves the search. Filter and sort changes push; URL canonicalisation replaces                                                                                                                                                                                          | From the Phase 2 review: every debounced commit used to push, so typing "stk", pausing, then "stk-1" created two Back steps                                                |
 | TA-29 | "View all N aging vehicles" replaces the list's filters with only `agingOnly=true` (sort and page reset, `pageSize` kept like Clear filters, unapplied drafts dropped, history push), so the list shows exactly the N the button promises. The "Aging only" checkbox in the filter bar still combines with other filters (AC-004.3)                                                                                                        | During T-024 the button kept other filters, so with make=Ford it said 19 but showed 3, contradicting its own label                                                         |
 | TA-30 | "Blank" text (BR-11/BR-12) = nothing left after removing whitespace (`\s`) and Unicode format characters (`\p{Cf}`, e.g. U+200B zero-width space). A blank "Logged by" is rejected ("Enter your name"); a blank note is stored as NULL. Otherwise the trimmed original is stored, and length limits count code points of the trimmed original. Implemented once in `shared/api/actions.ts` (`isBlankText`) and used by API, form, and mock | Phase 4 review: a name of only U+200B was accepted although it looks empty                                                                                                 |
+| TA-31 | Refresh feedback: no extra live region (single-announcer rule). The button shows "Refreshing…" with `aria-disabled` and keeps focus; when it finishes, the visible "Last updated" time changes. A failed refresh shows the existing quiet stale hints in each section. "Last updated" shows the **oldest** `dataUpdatedAt` among the sections that have data, so it never overstates freshness                                             | Phase 5 review: the newest time could hide a stale list (NFR-05)                                                                                                           |
+| TA-32 | The "Logged by" name is stored in this browser's `localStorage` (`inventory.loggedBy`) with no expiry. It is a display name the manager typed, not a credential. On a shared PC the next user sees it pre-filled and can edit it. Clearing site data removes it                                                                                                                                                                            | PII note from the Phase 5 review; acceptable for AC-012.1 with no authentication (A-01)                                                                                    |
 
 ## 9. Traceability
 
@@ -1059,19 +1061,25 @@ will be asserted once T-023/T-024 exist.
 
 ### Phase 5 - Should stories (US-008..US-012, US-011 UI)
 
+> **Status (2026-10-08):** T-034..T-037 are implemented in the working tree but **not committed**.
+> The end-of-phase review requested changes (sort re-announced on Back/Forward; a search-draft race
+> that can drop keystrokes under load), and the fix round was paused at the stakeholder's request
+> to write the System Design Document and README first. The checkboxes reflect the
+> implementation, not the release state.
+
 - [x] **T-033** DealershipSelector (switch resets filters; URL keeps selection) · layer: web · S · depends-on: T-010, T-017 · covers: AC-008.1, AC-008.2, AC-008.3, BR-04
   - Files: `src/features/dealerships/components/DealershipSelector.tsx` (+test, +story), `DashboardPage.tsx`
   - Test plan: lists all dealerships A-Z with the current one selected; choosing Leeds navigates to `/dealerships/2` with no search params; KPIs, aging, and list requests use id 2.
-- [ ] **T-034** RefreshControl ("Last updated", manual Refresh) + 60 s polling config · layer: web · M · depends-on: T-023, T-024, T-032 · covers: AC-009.1, AC-009.2, AC-009.3, NFR-05
+- [x] **T-034** RefreshControl ("Last updated", manual Refresh) + 60 s polling config · layer: web · M · depends-on: T-023, T-024, T-032 · covers: AC-009.1, AC-009.2, AC-009.3, NFR-05
   - Files: `src/features/inventory/components/RefreshControl.tsx` (+test), `inventory.queries.ts` (`refetchInterval`, `refetchOnWindowFocus`, `keepPreviousData`), `vehicle-detail.queries.ts`, `DashboardPage.test.tsx`
   - Test plan: Refresh triggers the summary and list requests and updates "Last updated" (fake time); the query options declare `refetchInterval: 60000`; after a refetch the URL filters, page, and typed form input are unchanged; an MSW change from "another user" appears after Refresh.
-- [ ] **T-035** Needs attention: KPI card, row/aging label, filter toggle · layer: web · S · depends-on: T-015, T-019, T-022, T-023 · covers: AC-010.1, AC-010.2, BR-16
+- [x] **T-035** Needs attention: KPI card, row/aging label, filter toggle · layer: web · S · depends-on: T-015, T-019, T-022, T-023 · covers: AC-010.1, AC-010.2, BR-16
   - Files: `src/features/inventory/components/{AttentionBadge.tsx,KpiCards.tsx,FilterBar.tsx,VehicleTable.tsx,AgingSection.tsx}` (+tests)
   - Test plan: "Needs attention: 1" is shown; only that row has the text label "Needs attention"; the toggle sets `needsAttention=true`; the label is gone after the log-action refetch (covered with T-032 fixtures).
-- [ ] **T-036** Sort UI: sortable headers with aria-sort + live announcement · layer: web · M · depends-on: T-011, T-015, T-018 · covers: AC-011.1, AC-011.2, AC-011.3, BR-17
+- [x] **T-036** Sort UI: sortable headers with aria-sort + live announcement · layer: web · M · depends-on: T-011, T-015, T-018 · covers: AC-011.1, AC-011.2, AC-011.3, BR-17
   - Files: `src/features/inventory/components/SortableHeader.tsx` (+test), `VehicleTable.tsx`
   - Test plan: clicking Price sends `sort=price&order=asc`, and clicking again sends desc; `aria-sort="ascending"` is on the `th`; the status region reads "Sorted by price, ascending"; reloading the URL restores the sort; the default Days header shows descending.
-- [ ] **T-037** Remember "Logged by" (persisted Zustand store) · layer: web · S · depends-on: T-032 · covers: AC-012.1, BR-12
+- [x] **T-037** Remember "Logged by" (persisted Zustand store) · layer: web · S · depends-on: T-032 · covers: AC-012.1, BR-12
   - Files: `src/features/vehicle-actions/store.ts` (+ `store.test.ts`), `LogActionForm.tsx`, `useLogAction.ts`, `src/test/setup.ts` (reset list + `localStorage.clear()`)
   - Test plan: after a successful save as "Jane Smith", reopening the form shows it prefilled and editable; a rehydrated invalid value (" " or 500 chars) is ignored; a failed save doesn't store the name.
 

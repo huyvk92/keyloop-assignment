@@ -483,3 +483,81 @@ Scaffold (`/init-react-app`) -> TDD implementation (`/implement-trd`) -> Review 
     - Enter on Save keeps focus on Save while saving and after saving.
     - With `?needsAttention=true`, the logged row leaves the list. Escape then sends focus to
       `#inventory-list` "Vehicle list", not body.
+
+### 2026-10-08 · implement-trd phase 5 (Should stories: T-034..T-037)
+
+- **Setup**: One web agent did the tasks in sequence (T-035, T-036, T-034, T-037), because they
+  share VehicleTable, FilterBar, DashboardPage and both locale files. Parallel agents editing
+  `en.ts`/`vi.ts` at the same time risked clobbering each other.
+- **Interruption**: The agent stalled with no output for 600 s under heavy machine load while
+  writing the T-036 tests. I checked the working tree: T-035 was complete and T-036 was partial.
+  I resumed the same agent with instructions to re-check what was done first, run targeted tests
+  while iterating, and background long commands. After resuming it found and fixed a real bug in
+  its own half-written work: Back/Forward re-announced the sort.
+- **AI output**:
+  - 5th KPI "Needs attention", a text label on rows and aging items, and a "Needs attention
+    only" filter.
+  - Sortable headers (`aria-sort`, default orders per TA-06, canonical URL) with exactly one
+    announcement per sort.
+  - RefreshControl: "Last updated" and an active-only, dealership-scoped refetch; vehicle detail
+    now also polls every 60 s.
+  - The first real Zustand store: "Logged by" persisted with Zod-validated rehydration, written
+    only after a successful save.
+  - `npm run validate` passed twice: web 674, API 369, perf 7.
+- **My verification (real Chrome, real API, file DB)**:
+  - At 1280 px, EN and VI: 5 KPIs on one row, bottom at y=239, Needs attention = 46.
+  - Sorting by price gives `?sort=price&order=asc`, `aria-sort=ascending`, and £7,990 first; a
+    second click gives `desc`.
+  - The needs-attention filter gives "46 vehicles match", with all 25 rows labelled.
+  - Refresh refetches summary, list and facets, and keeps the URL filter.
+  - " Minh Nguyen " was saved, then prefilled as "Minh Nguyen" after a full reload, with
+    validated localStorage.
+  - axe found 0 violations in EN and VI, and there was no horizontal overflow at 768 px.
+- **End-of-phase review**: The code reviewer returned CHANGES REQUESTED with 2 MAJOR findings.
+  1. The sort was still re-announced after Back then Forward, and across a dealership round-trip.
+     The agent had believed this was fixed, but its test only covered Back after a filter change.
+  2. A pre-existing Phase 2 race in `useSearchDraft` could drop typed characters under load.
+     The `validate` run showed "-10" typed after "stk" becoming "stk10". It is user-visible, and
+     5 earlier reviews and every idle run had missed it.
+  - The test engineer: the automatic 60 s poll was never exercised. NFR-05/TA-14 were "proven"
+    only by option values, and `refetchIntervalInBackground: false` is the TanStack default, so
+    that assertion proved nothing. AC-005.4 still has no automated viewport check (moved to T-042).
+- **My orchestration mistake**: I ran the reviewer and the tester in parallel, and both ran
+  coverage into the same `coverage/` directory. Each `validate` they ran then failed with
+  "coverage directory already in use". From now on, parallel read-only agents get a private
+  `--coverage.reportsDirectory`.
+- **Decisions**:
+  - TA-31: Refresh adds no new live region, and "Last updated" shows the **oldest**
+    `dataUpdatedAt`, so it never overstates freshness.
+  - TA-32: the "Logged by" name in localStorage is a documented PII note.
+  - Everything else goes to a single web fix agent, with a failing test written first for each
+    behaviour fix.
+
+### 2026-10-08 · System Design Document and README (Phase 5/6 paused)
+
+- **Human decision**: The stakeholder asked to put Phase 5 and 6 on hold and write the System
+  Design Document and README first. I stopped the Phase 5 fix agent, which was waiting for its
+  first `validate`, and left its changes uncommitted so it can be resumed with its context.
+- **AI output**:
+  - `/create-system-design` → `tech-lead-architect` wrote `docs/SYSTEM_DESIGN.md` (729 lines,
+    10 sections). It includes all 16 PRD and 32 technical assumptions, architecture and sequence
+    diagrams traced to the code, the real schema, ADR summaries, deliberate non-goals, the quality
+    strategy, and a concrete AI-process section with 16 corrections and the orchestrator's own
+    mistakes.
+  - It listed 8 places where the TRD and the code disagree, with the code taking precedence.
+- **README (written by me, in parallel)**: quick start, a reproducible demo with `APP_TODAY`, a
+  walkthrough of the 3 brief requirements, the API table, structure, scripts, an honest status,
+  and troubleshooting. I checked every concrete claim against a fresh seeded API: 360/86/23.9%/86,
+  vehicle 224 = STK-1223 aging with no action (the curl POST returns 201), and in the 90-91 range
+  91 is aging while 90 is not.
+- **Validation of the SDD (mine)**:
+  - A script confirmed that every A-01..A-16 and TA-01..TA-32 is present.
+  - I read the architecture and sequence diagrams against the code, plus the AI-process section.
+- **Corrections**:
+  1. Row 11 claimed TA-29 was caught by a real-browser check; I caught it by reading the agent's
+     reported decision.
+  2. §10.6 said the 60 s poll was "observed in the browser"; it was never observed or tested by
+     timer.
+  3. It said the README was still open; the README was written in parallel.
+  4. Following discrepancy 1, the TRD Phase 5 section now carries a status note: implemented,
+     uncommitted, review fixes paused.
