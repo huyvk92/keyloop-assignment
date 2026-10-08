@@ -260,9 +260,11 @@ describe('No vehicles match your filters (AC-002.8)', () => {
     await user.click(apply());
 
     expect(await screen.findByText('No vehicles match your filters')).toBeVisible();
-    // The empty state is not a second status region; the count announces the outcome.
+    // The empty state is not a second status region; the count announces the outcome (the
+    // list's sort status stays empty: no sort was chosen, AC-011.3).
     expect(screen.getAllByRole('status').map((status) => status.textContent)).toEqual([
       '0 vehicles match your filters',
+      '',
     ]);
     expect(announcements).toEqual(['0 vehicles match your filters']);
 

@@ -62,6 +62,15 @@ describe('inventory queries', () => {
     expect(body.items).toHaveLength(5);
   });
 
+  it('polls every polled query exactly every 60 s, only while the tab is visible (TA-14, ADR-007)', () => {
+    const query = VehicleListQuerySchema.parse({});
+    for (const options of [vehicleListOptions(1, query), agingStockOptions(1), summaryOptions(1)]) {
+      expect(options.refetchInterval).toBe(60_000);
+      expect(options.refetchIntervalInBackground).toBe(false);
+      expect(options.refetchOnWindowFocus).toBe(true);
+    }
+  });
+
   it('caches facets for 5 minutes without polling (TRD section 5)', () => {
     const options = facetsOptions(1);
 

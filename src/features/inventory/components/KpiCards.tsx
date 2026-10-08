@@ -9,9 +9,11 @@ type Props = { dealershipId: number };
 type Kpi = { key: string; label: string; value: ReactNode };
 
 /**
- * KPI summary (US-005): Total vehicles, Aging, % aging and Average days in stock over the
- * dealership's whole stock, never the filtered list (BR-15, AC-005.2). A `<dl>` of compact cards
- * at the top of the page, so it is visible without scrolling at 1280x800 (AC-005.4).
+ * KPI summary (US-005, US-010): Total vehicles, Aging, % aging, Average days in stock and Needs
+ * attention over the dealership's whole stock, never the filtered list (BR-15, BR-16, AC-005.2).
+ * A `<dl>` of compact cards at the top of the page, so it is visible without scrolling at
+ * 1280x800 (AC-005.4): the five cards share one row from `lg` (2 then 3 columns below; in 2
+ * columns the last card spans the row).
  *
  * States: loading (labels with skeleton values, `aria-busy`, one visually hidden "Loading…" for
  * the section), error with Retry (only when nothing has loaded), success. A failed background
@@ -47,6 +49,11 @@ export function KpiCards({ dealershipId }: Props) {
           integer(data.averageDaysInStock)
         )),
     },
+    {
+      key: 'needsAttention',
+      label: t('inventory.kpis.needsAttention'),
+      value: data && integer(data.needsAttentionCount),
+    },
   ];
 
   return (
@@ -63,12 +70,13 @@ export function KpiCards({ dealershipId }: Props) {
           onRetry={() => void refetch()}
         />
       ) : (
-        <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {kpis.map((kpi) => (
-            // Column + space-between: values line up even when a (translated) label wraps.
+            // Column + space-between: values line up even when a (translated) label wraps. Below
+            // `sm` (2 columns) the fifth card spans the row instead of sitting alone in half of it.
             <div
               key={kpi.key}
-              className="flex flex-col justify-between rounded-lg border border-slate-200 bg-white px-4 py-3"
+              className="flex flex-col justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 max-sm:last:col-span-2"
             >
               <dt id={`${id}-${kpi.key}`} className="text-sm font-medium text-slate-600">
                 {kpi.label}

@@ -12,6 +12,7 @@ import { apiUrl } from '@/lib/http';
 import { EXAMPLE_ACTION_BODY, mockActionStore } from '@/mocks/action-store';
 import { server } from '@/mocks/server';
 import { createTestQueryClient } from '@/test/render';
+import { useLoggedByStore } from '../store';
 import { useVehicleDetail, vehicleDetailOptions, vehicleKeys } from '../api/vehicle-detail.queries';
 import { useLogAction } from './useLogAction';
 
@@ -70,6 +71,8 @@ describe('useLogAction (T-032)', () => {
       expect(agingItem(result)?.currentAction?.status).toBe('Price Reduction Planned'),
     );
     expect(agingItem(result)?.needsAttention).toBe(false);
+    // The name the server stored is remembered for the next entry (AC-012.1).
+    expect(useLoggedByStore.getState().loggedBy).toBe('Jane Smith');
   });
 
   it('never refreshes another dealership (BR-04)', async () => {
@@ -112,5 +115,6 @@ describe('useLogAction (T-032)', () => {
 
     expect(invalidate).not.toHaveBeenCalled();
     expect(mockActionStore.appended()).toEqual([]);
+    expect(useLoggedByStore.getState().loggedBy).toBe('');
   });
 });

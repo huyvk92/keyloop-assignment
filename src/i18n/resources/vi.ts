@@ -3,7 +3,8 @@ import type { TranslationShape } from './en';
 /**
  * Vietnamese UI text (US-015). Same keys as `en.ts`; `satisfies` rejects missing and extra keys.
  * Glossary: dashboard = "bảng điều khiển", inventory/stock = "tồn kho", Aging = "Tồn kho lâu",
- * dealership = "đại lý", action = "hành động", vehicle = "xe".
+ * dealership = "đại lý", action = "hành động", vehicle = "xe", Needs attention = "Cần xử lý",
+ * refresh = "làm mới".
  */
 export const vi = {
   app: {
@@ -71,6 +72,7 @@ export const vi = {
   },
   inventory: {
     agingBadge: 'Tồn kho lâu',
+    attentionBadge: 'Cần xử lý',
     kpis: {
       title: 'Tổng quan tồn kho',
       loadError: 'Không thể tải tổng quan tồn kho',
@@ -78,6 +80,7 @@ export const vi = {
       aging: 'Tồn kho lâu',
       agingPercent: '% tồn kho lâu',
       averageDays: 'Số ngày tồn kho trung bình',
+      needsAttention: 'Cần xử lý',
       noValue: 'Không có dữ liệu',
       refreshFailed: 'Không thể làm mới tổng quan tồn kho. Đang hiển thị số liệu tải gần nhất.',
     },
@@ -134,6 +137,7 @@ export const vi = {
         },
       },
       agingOnly: 'Chỉ xe tồn kho lâu (trên 90 ngày)',
+      needsAttentionOnly: 'Chỉ xe cần xử lý',
       ageRange: {
         legend: 'Khoảng số ngày tùy chọn',
         min: 'Số ngày tối thiểu',
@@ -174,6 +178,26 @@ export const vi = {
         colour: 'Màu sắc',
         vin: 'Số VIN',
       },
+    },
+    sort: {
+      announcement: 'Đã sắp xếp theo {{column}}, {{order}}',
+      keys: {
+        age: 'số ngày tồn kho',
+        price: 'giá',
+        makeModel: 'hãng xe và mẫu xe',
+      },
+      orders: {
+        asc: 'tăng dần',
+        desc: 'giảm dần',
+      },
+      hints: {
+        makeModel: 'Sắp xếp theo hãng xe, rồi theo mẫu xe',
+      },
+    },
+    refresh: {
+      lastUpdated: 'Cập nhật lúc {{time}}',
+      button: 'Làm mới',
+      refreshing: 'Đang làm mới…',
     },
     pagination: {
       label: 'Phân trang',

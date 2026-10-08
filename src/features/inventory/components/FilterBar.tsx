@@ -17,13 +17,14 @@ const isAgeBucket = (value: string): value is AgeBucket =>
   (AGE_BUCKETS as readonly string[]).includes(value);
 
 /**
- * Inventory filters (US-002): search, make/model, age bucket, aging only and a custom age
- * range, all combined with AND (BR-05). The controls read and write the URL through
+ * Inventory filters (US-002, US-010): search, make/model, age bucket, aging only, needs attention
+ * only and a custom age range, all combined with AND (BR-05). The controls read and write the URL through
  * `useInventorySearchParams`, so they are restored on reload (AC-002.7).
  *
- * Compact so the page stays short (AC-005.4): from `lg`, search, make, model, age bucket and
- * aging only share one row, and the custom range and the match count a second one. Narrower
- * screens wrap the same controls; nothing scrolls horizontally at 768 px.
+ * Compact so the page stays short (AC-005.4): at 1280 px, search, make, model, age bucket and the
+ * two checkboxes share one row, and the custom range and the match count a second one. Narrower
+ * screens wrap the same controls (the two checkboxes move together); nothing scrolls
+ * horizontally at 768 px.
  */
 export function FilterBar({ dealershipId }: Props) {
   const { t } = useTranslation();
@@ -83,12 +84,18 @@ export function FilterBar({ dealershipId }: Props) {
           <span aria-hidden="true" className="invisible font-medium">
             {'\u00a0'}
           </span>
-          <div className="flex min-h-10 items-center">
+          <div className="flex min-h-10 flex-wrap items-center gap-x-4 gap-y-2">
+            {/* Unchecked means "no restriction" and leaves the URL (TA-27). */}
             <Checkbox
               label={t('inventory.filters.agingOnly')}
               checked={query.agingOnly ?? false}
-              // Unchecked means "no restriction" and leaves the URL (TA-27).
               onChange={(event) => setFilter('agingOnly', event.target.checked || undefined)}
+            />
+            {/* Aging with "No action" (BR-16, AC-010.1); combines with the other filters. */}
+            <Checkbox
+              label={t('inventory.filters.needsAttentionOnly')}
+              checked={query.needsAttention ?? false}
+              onChange={(event) => setFilter('needsAttention', event.target.checked || undefined)}
             />
           </div>
         </div>

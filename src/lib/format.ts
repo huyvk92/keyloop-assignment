@@ -152,6 +152,17 @@ export function formatDateTime(
   return `${joinDate(parts, locale)}${separator}${part(parts, 'hour')}:${part(parts, 'minute')}`;
 }
 
+/**
+ * Format an epoch instant (ms) as 24-hour "14:32" in an IANA time zone, e.g. "Last updated 14:32"
+ * (US-009). en-GB and vi-VN both use this 24-hour HH:mm (TA-26), so it takes no locale.
+ * Throws RangeError for an invalid instant.
+ */
+export function formatTime(epochMs: number, timeZone: string): string {
+  if (!Number.isFinite(epochMs)) throw new RangeError(`Invalid instant: ${epochMs}`);
+  const parts = dateTimeFormatter(timeZone).formatToParts(new Date(epochMs));
+  return `${part(parts, 'hour')}:${part(parts, 'minute')}`;
+}
+
 const integerFormatters = new Map<Locale, Intl.NumberFormat>();
 
 /** Format a whole number with the locale's grouping: "1,200" (en-GB), "1.200" (vi-VN). */

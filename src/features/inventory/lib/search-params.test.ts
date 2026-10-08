@@ -79,6 +79,35 @@ describe('fromSearchParams', () => {
     expect(query).toEqual(parse(search).query);
     expect(query.agingOnly).toBeUndefined();
   });
+
+  it.each([
+    ['order=desc', ''],
+    ['sort=age&order=desc', ''],
+    ['sort=price&order=asc', 'sort=price'],
+    ['sort=makeModel&order=asc', 'sort=makeModel'],
+    ['sort=makeModel&order=asc&page=2', 'sort=makeModel&page=2'],
+  ])(
+    'drops an order that is the sort key default from "%s" (one URL per sort, TA-06)',
+    (input, expected) => {
+      const { query, search } = parse(input);
+
+      expect(search).toBe(expected);
+      expect(query.order).toBeUndefined();
+      // One query, so one cache key, whichever of the two URLs was opened.
+      expect(query).toEqual(parse(expected).query);
+    },
+  );
+
+  it.each([
+    ['order=asc', 'order=asc'],
+    ['sort=price&order=desc', 'sort=price&order=desc'],
+    ['sort=makeModel&order=desc', 'sort=makeModel&order=desc'],
+  ])('keeps an order that differs from the key default in "%s"', (input, expected) => {
+    const { query, search } = parse(input);
+
+    expect(search).toBe(expected);
+    expect(query.order).toBe(new URLSearchParams(expected).get('order'));
+  });
 });
 
 describe('toSearchParams', () => {
@@ -86,6 +115,15 @@ describe('toSearchParams', () => {
     const query = VehicleListQuerySchema.parse({ agingOnly: 'true', page: 3, sort: 'age' });
 
     expect(toSearchParams(query).toString()).toBe('agingOnly=true&page=3');
+  });
+
+  it("omits an order equal to the sort key's default (TA-06)", () => {
+    expect(toSearchParams({ sort: 'price', order: 'asc' }).toString()).toBe('sort=price');
+    expect(toSearchParams({ sort: 'age', order: 'desc' }).toString()).toBe('');
+    expect(toSearchParams({ order: 'desc' }).toString()).toBe('');
+    expect(toSearchParams({ sort: 'price', order: 'desc' }).toString()).toBe(
+      'sort=price&order=desc',
+    );
   });
 });
 

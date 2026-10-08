@@ -10,16 +10,21 @@ const meta = preview.meta({
   title: 'Inventory/KpiCards',
   component: KpiCards,
   parameters: { layout: 'padded' },
-  // Default MSW data: Birmingham (id 1) has 30 vehicles, 19 over 90 days.
+  // Default MSW data: Birmingham (id 1) has 30 vehicles, 19 over 90 days, 12 of them without an
+  // action.
   args: { dealershipId: 1 },
 });
 
-/** Whole-stock KPIs (AC-005.1). */
+/** The five whole-stock KPIs on one row from `lg` (AC-005.1, AC-010.1). */
 export const Default = meta.story({
   play: async ({ canvas }) => {
     const total = await canvas.findByRole('definition', { name: 'Total vehicles' });
     await expect(total).toHaveTextContent('30');
     await expect(canvas.getByRole('definition', { name: 'Aging' })).toHaveTextContent('19');
+    await expect(canvas.getByRole('definition', { name: 'Needs attention' })).toHaveTextContent(
+      '12',
+    );
+    await expect(canvas.getAllByRole('term')).toHaveLength(5);
   },
 });
 

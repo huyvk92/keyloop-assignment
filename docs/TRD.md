@@ -1061,11 +1061,11 @@ will be asserted once T-023/T-024 exist.
 
 ### Phase 5 - Should stories (US-008..US-012, US-011 UI)
 
-> **Status (2026-10-08):** T-034..T-037 are implemented in the working tree but **not committed**.
-> The end-of-phase review requested changes (sort re-announced on Back/Forward; a search-draft race
-> that can drop keystrokes under load), and the fix round was paused at the stakeholder's request
-> to write the System Design Document and README first. The checkboxes reflect the
-> implementation, not the release state.
+> **Status (2026-10-08):** T-034..T-037 are done. The review fix round (paused for the System
+> Design Document) was resumed and completed: no sort re-announcement on Back/Forward or after a
+> dealership round-trip; no lost keystrokes when the search commit lands late; one canonical URL
+> per sort; "Last updated" uses the oldest data (TA-31); the 60 s poll and hidden-tab behaviour are
+> tested with fake timers.
 
 - [x] **T-033** DealershipSelector (switch resets filters; URL keeps selection) · layer: web · S · depends-on: T-010, T-017 · covers: AC-008.1, AC-008.2, AC-008.3, BR-04
   - Files: `src/features/dealerships/components/DealershipSelector.tsx` (+test, +story), `DashboardPage.tsx`

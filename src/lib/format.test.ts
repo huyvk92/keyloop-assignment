@@ -1,6 +1,7 @@
 import {
   formatDate,
   formatDateTime,
+  formatTime,
   formatInteger,
   formatMileage,
   formatMoney,
@@ -60,6 +61,18 @@ describe('formatDateTime', () => {
 
   it('rejects an invalid timestamp', () => {
     expect(() => formatDateTime('not-a-date', 'Europe/London')).toThrow(RangeError);
+  });
+});
+
+describe('formatTime', () => {
+  it('formats an epoch instant as 24-hour HH:mm in the time zone, 24-hour in both languages (US-009, TA-26)', () => {
+    const instant = Date.parse('2026-10-07T13:32:00.000Z');
+    expect(formatTime(instant, 'Europe/London')).toBe('14:32');
+    expect(formatTime(Date.parse('2026-01-01T00:05:00.000Z'), 'Europe/London')).toBe('00:05');
+  });
+
+  it('throws RangeError for an invalid instant', () => {
+    expect(() => formatTime(Number.NaN, 'Europe/London')).toThrow(RangeError);
   });
 });
 

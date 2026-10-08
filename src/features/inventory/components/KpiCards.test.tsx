@@ -49,12 +49,21 @@ describe('KpiCards', () => {
       within(region())
         .getAllByRole('term')
         .map((term) => term.textContent),
-    ).toEqual(['Total vehicles', 'Aging', '% aging', 'Average days in stock']);
+    ).toEqual(['Total vehicles', 'Aging', '% aging', 'Average days in stock', 'Needs attention']);
     expect(kpi('Total vehicles')).toHaveTextContent('8');
     expect(kpi('Aging')).toHaveTextContent('3');
     expect(kpi('% aging')).toHaveTextContent('37.5%');
     expect(kpi('Average days in stock')).toHaveTextContent('75');
     expect(region()).not.toHaveAttribute('aria-busy');
+  });
+
+  it('shows "Needs attention: 1" for 3 aging vehicles of which 1 has no action (AC-010.1, BR-16)', async () => {
+    mockSummary(() => HttpResponse.json(buildSummary({ agingCount: 3, needsAttentionCount: 1 })));
+    renderKpis();
+
+    expect(await within(region()).findByText('37.5%')).toBeVisible();
+    // The term and its value are read together: "Needs attention: 1".
+    expect(kpi('Needs attention')).toHaveTextContent(/^1$/);
   });
 
   it('shows "-" for the average when there are no vehicles (AC-005.3, BR-15)', async () => {
@@ -120,7 +129,7 @@ describe('KpiCards', () => {
     renderKpis();
 
     expect(region()).toHaveAttribute('aria-busy', 'true');
-    expect(within(region()).getAllByRole('term')).toHaveLength(4);
+    expect(within(region()).getAllByRole('term')).toHaveLength(5);
     // "Loading…" is said once for the section; the value skeletons are hidden, not repeated.
     expect(within(region()).getAllByText('Loading…')).toHaveLength(1);
     expect(kpi('Total vehicles')).toHaveTextContent('');
@@ -204,5 +213,6 @@ describe('KpiCards', () => {
     expect(
       within(vi).getByRole('definition', { name: 'Số ngày tồn kho trung bình' }),
     ).toHaveTextContent('75');
+    expect(within(vi).getByRole('definition', { name: 'Cần xử lý' })).toHaveTextContent('2');
   });
 });

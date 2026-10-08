@@ -73,6 +73,8 @@ export const en = {
   },
   inventory: {
     agingBadge: 'Aging',
+    /** Aging and no current action (BR-16); a text label, never colour alone (AC-010.1). */
+    attentionBadge: 'Needs attention',
     /** KPI cards (US-005): whole-stock summary of the dealership, never the filtered list. */
     kpis: {
       /** Accessible name of the KPI region (visually hidden heading). */
@@ -82,6 +84,8 @@ export const en = {
       aging: 'Aging',
       agingPercent: '% aging',
       averageDays: 'Average days in stock',
+      /** Aging vehicles with "No action" (BR-16, AC-010.1). */
+      needsAttention: 'Needs attention',
       /** Read instead of the visual "-" when there is no average (no vehicles, BR-15). */
       noValue: 'Not available',
       /** Quiet hint (not a live region) when a background refresh fails; last values stay. */
@@ -147,6 +151,8 @@ export const en = {
         },
       },
       agingOnly: 'Aging only (over 90 days)',
+      /** Aging vehicles without an action (BR-16); combines with the other filters. */
+      needsAttentionOnly: 'Needs attention only',
       ageRange: {
         legend: 'Custom age range (days)',
         min: 'Minimum days',
@@ -193,6 +199,32 @@ export const en = {
         colour: 'Colour',
         vin: 'VIN',
       },
+    },
+    /** Sortable column headers (US-011). */
+    sort: {
+      /** Polite announcement after the user changes the sort (AC-011.3). */
+      announcement: 'Sorted by {{column}}, {{order}}',
+      /** The sort key as said in the announcement (TA-06). */
+      keys: {
+        age: 'days in stock',
+        price: 'price',
+        makeModel: 'make and model',
+      },
+      orders: {
+        asc: 'ascending',
+        desc: 'descending',
+      },
+      /** Accessible description of a header button whose key isn't its label alone. */
+      hints: {
+        makeModel: 'Sorts by make, then model',
+      },
+    },
+    /** "Last updated" and manual Refresh (US-009). */
+    refresh: {
+      /** `time` is HH:mm in the dealership time zone. */
+      lastUpdated: 'Last updated {{time}}',
+      button: 'Refresh',
+      refreshing: 'Refreshing…',
     },
     pagination: {
       label: 'Pagination',

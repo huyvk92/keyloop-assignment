@@ -7,6 +7,7 @@ import { apiUrl } from '@/lib/http';
 import { FIXTURE_HISTORY_VEHICLES } from '@/mocks/fixtures';
 import { server } from '@/mocks/server';
 import { renderWithProviders } from '@/test/render';
+import { LOGGED_BY_STORAGE_KEY, useLoggedByStore } from '../store';
 
 const detailUrl = apiUrl('/vehicles/:vehicleId');
 const actionsUrl = apiUrl('/vehicles/:vehicleId/actions');
@@ -245,7 +246,8 @@ describe('Logging an action from the dialog (T-032)', () => {
       within(dialog).getByRole('radio', { name: 'Price Reduction Planned' }),
     ).not.toBeChecked();
     expect(within(dialog).getByRole('textbox', { name: 'Note (optional)' })).toHaveValue('');
-    expect(within(dialog).getByRole('textbox', { name: 'Logged by' })).toHaveValue('  Jane Smith ');
+    // The stored (trimmed) name, ready for the next entry (AC-012.1).
+    expect(within(dialog).getByRole('textbox', { name: 'Logged by' })).toHaveValue('Jane Smith');
   });
 
   it('keeps every input after a 503 and succeeds on retry (AC-006.7)', async () => {
@@ -372,5 +374,88 @@ describe('Logging an action from the dialog (T-032)', () => {
     expect(alert).toHaveTextContent('Không thể lưu hành động');
     expect(alert).toHaveTextContent(message);
     expect(alert).not.toHaveTextContent('raw server text');
+  });
+});
+
+describe('Remembering "Logged by" (T-037, US-012)', () => {
+  const loggedByBox = (dialog: HTMLElement, name = 'Logged by') =>
+    within(dialog).getByRole('textbox', { name });
+
+  /** Opens vehicle 2, logs an "Under Review" entry as `name` and waits for the outcome text. */
+  async function logAs(name: string, outcome = 'Action saved') {
+    const view = await openVehicle(2);
+    const dialog = await screen.findByRole('dialog', { name: /STK-1002/ });
+    await view.user.click(within(dialog).getByRole('radio', { name: 'Under Review' }));
+    await view.user.clear(loggedByBox(dialog));
+    await view.user.type(loggedByBox(dialog), name);
+    await view.user.click(within(dialog).getByRole('button', { name: 'Save action' }));
+    expect(await within(dialog).findByText(outcome)).toBeVisible();
+    return { ...view, dialog };
+  }
+
+  it('pre-fills the name when the form opens again, and it stays editable (AC-012.1)', async () => {
+    const { user, dialog } = await logAs('Jane Smith');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Open vehicle' }));
+
+    const reopened = await screen.findByRole('dialog', { name: /STK-1002/ });
+    expect(reopened).toBe(dialog);
+    expect(loggedByBox(reopened)).toHaveValue('Jane Smith');
+    await user.type(loggedByBox(reopened), ' Jr');
+    expect(loggedByBox(reopened)).toHaveValue('Jane Smith Jr');
+  });
+
+  it('pre-fills the name after a reload (AC-012.1)', async () => {
+    const { unmount } = await logAs('Jane Smith');
+    unmount();
+    // A reload: the in-memory state is gone and the store reads localStorage again. (Resetting
+    // the state writes it through `persist`, which a real reload doesn't, so storage is put back.)
+    const stored = window.localStorage.getItem(LOGGED_BY_STORAGE_KEY);
+    expect(stored).not.toBeNull();
+    useLoggedByStore.setState(useLoggedByStore.getInitialState(), true);
+    window.localStorage.setItem(LOGGED_BY_STORAGE_KEY, stored ?? '');
+    expect(useLoggedByStore.getState().loggedBy).toBe('');
+    await act(() => useLoggedByStore.persist.rehydrate());
+
+    await openVehicle(2);
+
+    const dialog = await screen.findByRole('dialog', { name: /STK-1002/ });
+    expect(loggedByBox(dialog)).toHaveValue('Jane Smith');
+  });
+
+  it('does not remember the name of a failed save (AC-012.1, BR-18)', async () => {
+    server.use(http.post(actionsUrl, () => HttpResponse.json(null, { status: 503 })));
+
+    const { dialog } = await logAs('Jane Smith', "Couldn't save the action");
+
+    expect(useLoggedByStore.getState().loggedBy).toBe('');
+    expect(window.localStorage.getItem(LOGGED_BY_STORAGE_KEY)).toBeNull();
+    // The typed name is still in the form for the retry (AC-006.7).
+    expect(loggedByBox(dialog)).toHaveValue('Jane Smith');
+  });
+
+  it('ignores an invalid stored name: the field starts empty (BR-12)', async () => {
+    window.localStorage.setItem(
+      LOGGED_BY_STORAGE_KEY,
+      JSON.stringify({ state: { loggedBy: '   ' }, version: 1 }),
+    );
+    await act(() => useLoggedByStore.persist.rehydrate());
+
+    await openVehicle(2);
+
+    const dialog = await screen.findByRole('dialog', { name: /STK-1002/ });
+    expect(loggedByBox(dialog)).toHaveValue('');
+  });
+
+  it('pre-fills the name as stored in Vietnamese, untranslated (BR-19)', async () => {
+    useLoggedByStore.getState().setLoggedBy('Nguyễn Văn An');
+    await i18n.changeLanguage('vi');
+
+    await openVehicle(2);
+
+    const dialog = await screen.findByRole('dialog', { name: /STK-1002/ });
+    expect(loggedByBox(dialog, 'Người ghi nhận')).toHaveValue('Nguyễn Văn An');
   });
 });

@@ -1,10 +1,14 @@
+import { focusManager } from '@tanstack/react-query';
 import { act, screen, waitFor, within } from '@testing-library/react';
-import type { UserEvent } from '@testing-library/user-event';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { routes } from '@/app/router';
 import { createI18n, i18n, LANGUAGE_STORAGE_KEY } from '@/i18n';
 import { apiUrl } from '@/lib/http';
+import { mockActionStore } from '@/mocks/action-store';
 import { server } from '@/mocks/server';
+import { recordAnnouncements } from '@/test/announcements';
+import { startManualClock, stopManualClock } from '@/test/manual-clock';
 import { preloadRouteModules, renderRoutes } from '@/test/render';
 
 const AGING_SEARCH = '?agingOnly=true&sort=age&order=desc&pageSize=10';
@@ -334,6 +338,26 @@ describe('DashboardPage', () => {
       expect(heading).toHaveFocus();
     });
 
+    it('does not announce a sort again after switching dealership and coming Back (AC-011.3)', async () => {
+      const { user, router } = renderRoutes(routes, { route: '/dealerships/1' });
+      await screen.findByText('Showing 1-25 of 30');
+      await user.click(screen.getByRole('button', { name: 'List price' }));
+      expect(await screen.findByText('Sorted by price, ascending')).toBeInTheDocument();
+      await user.selectOptions(screen.getByRole('combobox', { name: 'Dealership' }), 'Leeds');
+      await screen.findByText('Showing 1-4 of 4');
+      const { announcements } = recordAnnouncements();
+
+      await act(() => router.navigate(-1));
+
+      await screen.findByRole('heading', { level: 1, name: 'Birmingham' });
+      await screen.findByText('Showing 1-25 of 30');
+      expect(screen.getByRole('columnheader', { name: 'List price' })).toHaveAttribute(
+        'aria-sort',
+        'ascending',
+      );
+      expect(announcements.filter((text) => text.startsWith('Sorted'))).toEqual([]);
+    });
+
     it('labels the selector in Vietnamese (BR-19)', async () => {
       await i18n.changeLanguage('vi');
       renderRoutes(routes, { route: '/dealerships/3' });
@@ -396,6 +420,152 @@ describe('DashboardPage', () => {
       expect(document.documentElement.lang).toBe('vi');
     });
   });
+  describe('refresh (US-009, T-034)', () => {
+    it('shows "Last updated" and Refresh next to the h1, above the KPIs', async () => {
+      renderRoutes(routes, { route: '/dealerships/1' });
+
+      const heading = await screen.findByRole('heading', { level: 1, name: 'Birmingham' });
+      const refresh = screen.getByRole('button', { name: 'Refresh' });
+      expect(await screen.findByText(/^Last updated \d{2}:\d{2}$/)).toBeVisible();
+      const kpis = screen.getByRole('region', { name: 'Inventory summary' });
+      expect(heading.compareDocumentPosition(refresh)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+      expect(refresh.compareDocumentPosition(kpis)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+
+    it('refreshes the open vehicle too, keeping the URL and the typed form input (AC-009.1, AC-009.3)', async () => {
+      const { user, router } = renderRoutes(routes, {
+        route: '/dealerships/1?ageBucket=over-90&sort=price&order=desc',
+      });
+      await user.click(await screen.findByRole('button', { name: 'View STK-1002' }));
+      const dialog = await screen.findByRole('dialog', { name: /STK-1002/ });
+      await user.click(within(dialog).getByRole('radio', { name: 'Under Review' }));
+      await user.click(within(dialog).getByRole('textbox', { name: 'Note (optional)' }));
+      await user.paste('Half typed');
+      const before = router.state.location;
+      // Another manager logs an action for this vehicle on the server.
+      mockActionStore.log(2, { status: 'Marketing Promotion', loggedBy: 'Sam Patel' });
+
+      // jsdom has no inert background behind the modal, so the page button can be clicked here;
+      // in a browser the same refetch comes from the 60 s poll or window focus (ADR-007).
+      await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+      await waitFor(() =>
+        expect(
+          within(
+            within(dialog).getByRole('list', { name: 'Action history, newest first' }),
+          ).getAllByRole('listitem')[0],
+        ).toHaveTextContent('Logged by Sam Patel'),
+      );
+      expect(within(dialog).getByRole('radio', { name: 'Under Review' })).toBeChecked();
+      expect(within(dialog).getByRole('textbox', { name: 'Note (optional)' })).toHaveValue(
+        'Half typed',
+      );
+      expect(router.state.location.search).toBe('?ageBucket=over-90&sort=price&order=desc');
+      expect(router.state.location.key).toBe(before.key);
+    });
+  });
+
+  describe('automatic refresh every 60 s (AC-009.1, AC-009.3, NFR-05, TA-14)', () => {
+    type Polled = 'summary' | 'aging' | 'list' | 'detail';
+    /** Every polled request with the (fake) time it was made; the default handlers answer. */
+    function recordPolledRequests() {
+      const requests: { kind: Polled; at: number }[] = [];
+      server.use(
+        http.get(apiUrl('/dealerships/:dealershipId/vehicles'), ({ request }) => {
+          const kind = isAgingRequest(new URL(request.url)) ? 'aging' : 'list';
+          requests.push({ kind, at: Date.now() });
+        }),
+        http.get(apiUrl('/dealerships/:dealershipId/summary'), () => {
+          requests.push({ kind: 'summary', at: Date.now() });
+        }),
+        http.get(apiUrl('/vehicles/:vehicleId'), () => {
+          requests.push({ kind: 'detail', at: Date.now() });
+        }),
+      );
+      const kinds = () => requests.map(({ kind }) => kind).sort();
+      return { requests, kinds };
+    }
+
+    afterEach(() => {
+      // The focus manager is global: back to "follow the document" for the next test.
+      focusManager.setFocused(undefined);
+      stopManualClock();
+    });
+
+    it('polls every section and the open vehicle after exactly 60 s, keeping typed input and the URL', async () => {
+      startManualClock();
+      const { requests, kinds } = recordPolledRequests();
+      const { router } = renderRoutes(routes, {
+        route: '/dealerships/1?ageBucket=over-90&sort=price&order=desc',
+      });
+      const user = userEvent.setup({ delay: null });
+      await user.click(await screen.findByRole('button', { name: 'View STK-1002' }));
+      const dialog = await screen.findByRole('dialog', { name: /STK-1002/ });
+      await user.click(await within(dialog).findByRole('radio', { name: 'Under Review' }));
+      await user.click(within(dialog).getByRole('textbox', { name: 'Note (optional)' }));
+      await user.paste('Half typed');
+      await waitFor(() => expect(kinds()).toEqual(['aging', 'detail', 'list', 'summary']));
+      const loadedAt = new Map(requests.map(({ kind, at }) => [kind, at]));
+      const before = router.state.location;
+      requests.length = 0;
+      // Another manager logs an action for this vehicle on the server.
+      mockActionStore.log(2, { status: 'Marketing Promotion', loggedBy: 'Sam Patel' });
+
+      // 1 ms before the first section is due, nothing has been polled.
+      const firstDue = Math.min(...loadedAt.values()) + 60_000;
+      await act(() => vi.advanceTimersByTimeAsync(firstDue - 1 - Date.now()));
+      expect(requests).toEqual([]);
+      // Within the next 60 s every section and the drawer poll once, each one 60 s after its own
+      // load, never earlier. (The drawer's interval starts when its observer subscribes, a render
+      // tick after its fetch began, so its gap can be a few ms over 60 s.)
+      await act(() => vi.advanceTimersByTimeAsync(60_000));
+      expect(kinds()).toEqual(['aging', 'detail', 'list', 'summary']);
+      for (const { kind, at } of requests) {
+        const gap = at - (loadedAt.get(kind) ?? 0);
+        expect(gap).toBeGreaterThanOrEqual(60_000);
+        expect(gap).toBeLessThan(61_000);
+      }
+
+      await waitFor(() =>
+        expect(
+          within(
+            within(dialog).getByRole('list', { name: 'Action history, newest first' }),
+          ).getAllByRole('listitem')[0],
+        ).toHaveTextContent('Logged by Sam Patel'),
+      );
+      await waitFor(() =>
+        expect(screen.getByRole('row', { name: /STK-1002/ })).toHaveTextContent(
+          'Marketing Promotion',
+        ),
+      );
+      expect(within(dialog).getByRole('radio', { name: 'Under Review' })).toBeChecked();
+      expect(within(dialog).getByRole('textbox', { name: 'Note (optional)' })).toHaveValue(
+        'Half typed',
+      );
+      expect(router.state.location.search).toBe('?ageBucket=over-90&sort=price&order=desc');
+      expect(router.state.location.key).toBe(before.key);
+    });
+
+    it('does not poll while the window is unfocused, and refetches once on focus (TA-14)', async () => {
+      startManualClock();
+      const { requests, kinds } = recordPolledRequests();
+      renderRoutes(routes, { route: '/dealerships/1' });
+      await screen.findByText('Showing 1-25 of 30');
+      await waitFor(() => expect(kinds()).toEqual(['aging', 'list', 'summary']));
+      requests.length = 0;
+
+      act(() => focusManager.setFocused(false));
+      await act(() => vi.advanceTimersByTimeAsync(120_000));
+      expect(requests).toEqual([]);
+
+      act(() => focusManager.setFocused(true));
+      await waitFor(() => expect(kinds()).toEqual(['aging', 'list', 'summary']));
+      // One refetch each: nothing else follows until the next interval.
+      await act(() => vi.advanceTimersByTimeAsync(1_000));
+      expect(kinds()).toEqual(['aging', 'list', 'summary']);
+    });
+  });
+
   describe('vehicle drawer (T-030, T-032)', () => {
     it('opens a vehicle from its table row and returns focus to "View" on Escape (AC-004.4)', async () => {
       const { user } = renderRoutes(routes, { route: '/dealerships/1' });
@@ -446,6 +616,40 @@ describe('DashboardPage', () => {
           'Price Reduction Planned',
         ),
       );
+    });
+
+    it('drops the "Needs attention" label and lowers the KPI by 1 after logging, without a refresh (AC-010.1, AC-010.2)', async () => {
+      const { user } = renderRoutes(routes, { route: '/dealerships/1' });
+      const row = await screen.findByRole('row', { name: /STK-1002/ });
+      const kpi = () =>
+        within(screen.getByRole('region', { name: 'Inventory summary' })).getByRole('definition', {
+          name: 'Needs attention',
+        });
+      const agingItem = () =>
+        within(screen.getByRole('list', { name: 'Aging vehicles, oldest first' })).getByRole(
+          'button',
+          { name: /STK-1002/ },
+        );
+      // Birmingham fixtures: 19 aging, 7 of them with an action.
+      await waitFor(() => expect(kpi()).toHaveTextContent(/^12$/));
+      expect(within(row).getByText('Needs attention')).toBeVisible();
+      expect(await within(agingItem()).findByText('Needs attention')).toBeVisible();
+
+      await logActionFrom(user, within(row).getByRole('button', { name: 'View STK-1002' }));
+
+      await waitFor(() => expect(kpi()).toHaveTextContent(/^11$/));
+      await waitFor(() =>
+        expect(
+          within(screen.getByRole('row', { name: /STK-1002/ })).queryByText('Needs attention'),
+        ).not.toBeInTheDocument(),
+      );
+      await waitFor(() =>
+        expect(within(agingItem()).queryByText('Needs attention')).not.toBeInTheDocument(),
+      );
+      // Other vehicles keep their label.
+      expect(
+        within(screen.getByRole('row', { name: /STK-1003/ })).getByText('Needs attention'),
+      ).toBeVisible();
     });
 
     it('moves focus to the list on close when the vehicle left a "needs attention" list (ADR-006)', async () => {

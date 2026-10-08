@@ -9,12 +9,14 @@ import { useVehicleList } from '../api/inventory.queries';
 import { useInventorySearchParams } from '../hooks/useInventorySearchParams';
 import { FILTER_REGION_ID } from '../lib/search-params';
 import { Pagination } from './Pagination';
-import { VehicleTableView } from './VehicleTableView';
+import { VehicleTableView, type Sorting } from './VehicleTableView';
 
 type Props = {
   dealership: Dealership;
   /** Opens a vehicle from its row's "View" button (AC-004.4). */
   onSelectVehicle?: (vehicleId: number) => void;
+  /** Makes the sortable headers buttons (US-011). */
+  sorting?: Sorting;
 };
 
 /**
@@ -22,7 +24,7 @@ type Props = {
  * ("No vehicles in stock" or "No vehicles match your filters") and success states
  * (AC-001.4..6, AC-002.8). Rendered inside `VehicleTable`'s focusable list region.
  */
-export function VehicleTableContent({ dealership, onSelectVehicle }: Props) {
+export function VehicleTableContent({ dealership, onSelectVehicle, sorting }: Props) {
   const { t } = useTranslation();
   const { query, hasFilters, setPage, clearFilters, searchFor } = useInventorySearchParams(
     dealership.id,
@@ -90,6 +92,7 @@ export function VehicleTableContent({ dealership, onSelectVehicle }: Props) {
         vehicles={data.items}
         dealership={dealership}
         onSelectVehicle={onSelectVehicle}
+        sorting={sorting}
       />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Pagination

@@ -11,8 +11,10 @@ type Submit = (body: unknown) => Promise<unknown>;
  * Every query goes through the test's own container (not `screen`), so a test that timed out and
  * keeps running can't type into or click the next test's form.
  */
-function renderForm(onSubmit = vi.fn<Submit>().mockResolvedValue({})) {
-  const view = renderWithProviders(<LogActionForm onSubmit={onSubmit} />);
+function renderForm(onSubmit = vi.fn<Submit>().mockResolvedValue({}), defaultLoggedBy?: string) {
+  const view = renderWithProviders(
+    <LogActionForm onSubmit={onSubmit} defaultLoggedBy={defaultLoggedBy} />,
+  );
   const ui = within(view.container);
   return {
     ...view,
@@ -150,6 +152,35 @@ describe('LogActionForm (T-031)', () => {
       note,
       loggedBy: 'Jane Smith',
     });
+  });
+
+  it('pre-fills "Logged by" with the remembered name, still editable (AC-012.1)', async () => {
+    const { user, onSubmit, ui, loggedByBox, saveButton } = renderForm(undefined, 'Jane Smith');
+
+    expect(loggedByBox()).toHaveValue('Jane Smith');
+    await user.clear(loggedByBox());
+    await user.type(loggedByBox(), 'Sam Patel');
+    await user.click(ui.getByRole('radio', { name: 'Under Review' }));
+    await user.click(saveButton());
+
+    await ui.findByText('Action saved');
+    expect(onSubmit).toHaveBeenCalledWith({
+      status: 'Under Review',
+      note: '',
+      loggedBy: 'Sam Patel',
+    });
+  });
+
+  it('shows the saved (trimmed) name in "Logged by" after a save, ready for the next entry', async () => {
+    const { user, ui, loggedByBox, saveButton } = renderForm();
+
+    await user.click(ui.getByRole('radio', { name: 'Under Review' }));
+    await user.type(loggedByBox(), '  Jane ');
+    await user.click(saveButton());
+
+    await ui.findByText('Action saved');
+    expect(loggedByBox()).toHaveValue('Jane');
+    expect(loggedByBox()).not.toHaveAttribute('aria-invalid');
   });
 
   it('clears status and note after a save but keeps "Logged by"', async () => {

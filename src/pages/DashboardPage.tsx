@@ -10,10 +10,11 @@ import {
   FilterBar,
   KpiCards,
   LIST_REGION_ID,
+  RefreshControl,
   useCanonicalSearch,
   VehicleTable,
 } from '@/features/inventory';
-import { useVehicleSelection, VehicleDetailDialog } from '@/features/vehicle-actions';
+import { useVehicleSelection, VehicleDetailDialog, vehicleKeys } from '@/features/vehicle-actions';
 import { shouldKeepFocus } from '@/lib/navigation-focus';
 
 const listRegion = () => document.getElementById(LIST_REGION_ID);
@@ -66,7 +67,19 @@ export function DashboardPage() {
     <PageSection
       title={dealership.name}
       focusHeadingOnChange={!keepFocus}
-      actions={<DealershipSelector dealershipId={dealership.id} />}
+      actions={
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          {/* Next to the h1 and above the KPIs (US-009). Keyed by dealership, so a refresh still
+              running for the previous one can't show as busy here (BR-04). Also refreshes the
+              open vehicle's drawer. */}
+          <RefreshControl
+            key={dealership.id}
+            dealership={dealership}
+            alsoRefresh={selectedVehicleId === null ? [] : [vehicleKeys.detail(selectedVehicleId)]}
+          />
+          <DealershipSelector dealershipId={dealership.id} />
+        </div>
+      }
     >
       {/* Page order: KPIs → aging section → filters + list, so the summary is visible without
           scrolling at 1280x800 and the aging stock follows (AC-005.4, AC-004.1). */}
@@ -74,7 +87,14 @@ export function DashboardPage() {
       <AgingSection dealershipId={dealership.id} onSelectVehicle={selectVehicle} />
       {/* Keyed by dealership: a switch drops the search draft and any pending debounce (TA-10). */}
       <FilterBar key={dealership.id} dealershipId={dealership.id} />
-      <VehicleTable dealership={dealership} onSelectVehicle={selectVehicle} />
+      {/* Keyed by dealership too (prefixed: sibling keys must differ from FilterBar's), so a sort
+          chosen at one dealership is never announced after a round trip through another
+          (AC-011.3). */}
+      <VehicleTable
+        key={`list-${dealership.id}`}
+        dealership={dealership}
+        onSelectVehicle={selectVehicle}
+      />
       {/* If the opening row is gone on close (e.g. a saved action took the vehicle out of a
           "Needs attention" list), focus goes to the list region it was in (ADR-006). */}
       <VehicleDetailDialog

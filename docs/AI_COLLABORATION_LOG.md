@@ -561,3 +561,33 @@ Scaffold (`/init-react-app`) -> TDD implementation (`/implement-trd`) -> Review 
   3. It said the README was still open; the README was written in parallel.
   4. Following discrepancy 1, the TRD Phase 5 section now carries a status note: implemented,
      uncommitted, review fixes paused.
+
+### 2026-10-08 · phase 5 fix round resumed and completed
+
+- **Resume**: After the docs commit (`b676e27`), I resumed the stopped fix agent with its context
+  and told it to re-check what was already done first. Every item had been finished before the
+  pause. The only open issue was a test it had broken itself while editing a nearby test: a text
+  replacement had changed the start URL of an unrelated test. It fixed that, then `validate`
+  passed twice: web 699, API 369, perf 7.
+- **Fixes, each with a test that failed first**:
+  - The sort request is now one-shot and keyed by dealership.
+  - `useSearchDraft` remembers its own pending commits, as a list, so two late commits don't
+    clobber typing.
+  - There is one canonical URL per sort.
+  - "Last updated" shows the oldest data time (TA-31).
+  - A fake-timer 60 s poll test and a hidden-tab test were added. The agent checked that both
+    fail with a 30 s interval or with background polling switched on.
+  - VI strings are asserted, and `removeItem` is tested.
+  - The make/model sort test now checks the rendered order.
+  - The Make sort button has a description hint ("sorts by make, then model").
+- **My verification**:
+  - `npm run validate` passed (exit 0): 699 / 369 / 7.
+  - Real Chrome, real API:
+    - Sort → Back → Forward left the sort status empty: no re-announcement.
+    - Clicking the default "Days in stock" header gives a clean URL, and `?sort=age&order=desc`
+      becomes "".
+    - At **6x CPU throttling**, typing "stk", then "-10", then "4" in bursts around the 300 ms
+      debounce kept "stk-104" in the box and the URL. This is the exact scenario that used to
+      drop characters.
+- **Docs**: the TRD Phase 5 status note and the SDD (§1.2, §2.2, §8.1, §8.6, §6.5, §9, §10.5,
+  §10.6) were updated from "in progress" to the verified state.

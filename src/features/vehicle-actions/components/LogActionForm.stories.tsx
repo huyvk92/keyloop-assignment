@@ -12,6 +12,14 @@ const meta = preview.meta({
 /** Five statuses in ACTION_STATUSES order, optional note with a counter, "Logged by" (AC-006.1). */
 export const Default = meta.story({});
 
+/** "Logged by" pre-filled with the name remembered from the last save, still editable (AC-012.1). */
+export const RememberedName = meta.story({
+  args: { defaultLoggedBy: 'Jane Smith' },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole('textbox', { name: 'Logged by' })).toHaveValue('Jane Smith');
+  },
+});
+
 /** Saving with nothing filled in: field errors, focus on the status group (AC-006.4). */
 export const ValidationError = meta.story({
   play: async ({ canvas, userEvent, args }) => {

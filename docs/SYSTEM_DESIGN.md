@@ -4,7 +4,7 @@
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Brief   | `docs/ASSIGNMENT.md` (Keyloop, domain "Supply")                                                                                           |
 | Sources | `docs/PRD.md` v0.3, `docs/TRD.md` (ADR-001..009, TA-01..32), `docs/AI_COLLABORATION_LOG.md`, code on branch `feature/inventory-dashboard` |
-| Code    | HEAD `6e9822c` (Phases 1-4 committed) plus the uncommitted Phase 5 working tree (see §1.2)                                                |
+| Code    | Phases 1-5 committed on `feature/inventory-dashboard` (see §1.2); Phase 6 not started                                                     |
 | Updated | 2026-10-08                                                                                                                                |
 
 This document describes the code that exists, not the plan. Where the TRD and the code differ,
@@ -38,17 +38,17 @@ guide: demo walkthrough with `APP_TODAY`, reset, API table, troubleshooting.
 
 ### 1.2 Delivery status
 
-| Phase                                     | Tasks                                     | Status                                                        |
-| ----------------------------------------- | ----------------------------------------- | ------------------------------------------------------------- |
-| 1 Foundation + vertical slice             | T-001..T-012                              | Committed (`d8bf28a`, `76fa3d9`)                              |
-| 1b English / Vietnamese                   | T-045..T-047                              | Committed (`bf5a91a`)                                         |
-| Pulled forward: form primitives, dropdown | T-017, T-033                              | Committed (`cf8c88e`)                                         |
-| 2 Filters, search, sort API, facets       | T-013..T-016, T-018..T-020                | Committed (`397e8de`, `2ec3efe`)                              |
-| 3 KPIs + aging section                    | T-021..T-024                              | Committed (`74a7698`, `44ff632`)                              |
-| 4 Log + persist actions                   | T-025..T-032                              | Committed (`2431bca`, `6e9822c`)                              |
-| 5 Should stories                          | T-034..T-037                              | **Implemented, uncommitted, review fixes in progress** (§8.6) |
-| 6 Hardening                               | T-038..T-042 (+ optional T-043/T-044 CSV) | **Not started**, see §9                                       |
-| Won't                                     | US-014 configurable threshold             | Not planned (fixed 90 days)                                   |
+| Phase                                     | Tasks                                     | Status                                  |
+| ----------------------------------------- | ----------------------------------------- | --------------------------------------- |
+| 1 Foundation + vertical slice             | T-001..T-012                              | Committed (`d8bf28a`, `76fa3d9`)        |
+| 1b English / Vietnamese                   | T-045..T-047                              | Committed (`bf5a91a`)                   |
+| Pulled forward: form primitives, dropdown | T-017, T-033                              | Committed (`cf8c88e`)                   |
+| 2 Filters, search, sort API, facets       | T-013..T-016, T-018..T-020                | Committed (`397e8de`, `2ec3efe`)        |
+| 3 KPIs + aging section                    | T-021..T-024                              | Committed (`74a7698`, `44ff632`)        |
+| 4 Log + persist actions                   | T-025..T-032                              | Committed (`2431bca`, `6e9822c`)        |
+| 5 Should stories                          | T-034..T-037                              | Done, review fix round completed (§8.6) |
+| 6 Hardening                               | T-038..T-042 (+ optional T-043/T-044 CSV) | **Not started**, see §9                 |
+| Won't                                     | US-014 configurable threshold             | Not planned (fixed 90 days)             |
 
 ## 2. Requirements summary
 
@@ -64,17 +64,17 @@ Full requirements: `docs/PRD.md` (15 stories, BR-01..BR-19, NFR-01..NFR-10).
 
 ### 2.2 Story status
 
-| Story                                                  | Priority | Status                                                                    |
-| ------------------------------------------------------ | -------- | ------------------------------------------------------------------------- |
-| US-001..US-007 list, filter, aging, KPIs, log, persist | Must     | Done and committed                                                        |
-| US-015 English / Vietnamese                            | Must     | Done and committed                                                        |
-| US-008 switch dealership                               | Should   | Done and committed (pulled forward)                                       |
-| US-009 refresh / last updated                          | Should   | Implemented (Phase 5), review fixes in progress                           |
-| US-010 needs attention                                 | Should   | Server side committed (Phase 2/3); UI implemented in Phase 5              |
-| US-011 sort                                            | Should   | API committed (Phase 2); header UI implemented in Phase 5, one open MAJOR |
-| US-012 remember "Logged by"                            | Should   | Implemented (Phase 5)                                                     |
-| US-013 CSV export                                      | Could    | Not done (optional T-043/T-044)                                           |
-| US-014 configurable threshold                          | Won't    | Not done by decision                                                      |
+| Story                                                  | Priority | Status                                |
+| ------------------------------------------------------ | -------- | ------------------------------------- |
+| US-001..US-007 list, filter, aging, KPIs, log, persist | Must     | Done and committed                    |
+| US-015 English / Vietnamese                            | Must     | Done and committed                    |
+| US-008 switch dealership                               | Should   | Done and committed (pulled forward)   |
+| US-009 refresh / last updated                          | Should   | Done (Phase 5)                        |
+| US-010 needs attention                                 | Should   | Done (API Phase 2/3, UI Phase 5)      |
+| US-011 sort                                            | Should   | Done (API Phase 2, header UI Phase 5) |
+| US-012 remember "Logged by"                            | Should   | Done (Phase 5)                        |
+| US-013 CSV export                                      | Could    | Not done (optional T-043/T-044)       |
+| US-014 configurable threshold                          | Won't    | Not done by decision                  |
 
 ### 2.3 Non-functional requirements (summary)
 
@@ -269,7 +269,7 @@ flowchart TD
   Dialog --> Panel["VehicleDetailPanel: VehicleFacts, ActionHistory, LogActionSection → LogActionForm (only if isAging)"]
 ```
 
-`*` = added in Phase 5 (uncommitted).
+`*` = added in Phase 5.
 
 ### 5.2 State placement
 
@@ -449,7 +449,6 @@ stocked dealership has vehicles at exactly 0, 30, 31, 60, 61, 90, 91 days; `STK-
 
 | TRD says                                                                      | Code does                                                                                                                                                                                                                                                                                                     |
 | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| §10 ticks T-034..T-037 as done                                                | Implemented but uncommitted, with 2 open MAJOR review findings (§8.6)                                                                                                                                                                                                                                         |
 | §5 key table has no aging key; "every inventory query sets `refetchInterval`" | `inventoryKeys.aging(id)` exists (Phase 3 note); facets are **not** polled (stale 5 min); vehicle detail **is** polled (Phase 5)                                                                                                                                                                              |
 | §5 "Last updated shows the latest `dataUpdatedAt`"                            | Shows the oldest (TA-31 superseded §5)                                                                                                                                                                                                                                                                        |
 | §6 Observability: actions service logs `{ actionId, vehicleId, status }`      | No such log. Only pino request logs, the startup log (`applied`, `seeded`, `today`) and shutdown                                                                                                                                                                                                              |
@@ -506,13 +505,13 @@ stocked dealership has vehicles at exactly 0, 30, 31, 60, 61, 90, 91 days; `STK-
 | Real browser       | Headless Chrome via `puppeteer-core` (scratchpad only, not a repo dependency) + axe-core    | Layout, real Intl, real focus, end-to-end against the real API                                                |
 | E2E                | Playwright (T-042)                                                                          | **Not done**                                                                                                  |
 
-Current numbers (from the collaboration log; the suite was not re-run for this document because a
-fix round may resume):
+Current numbers (from `npm run validate` runs recorded in the collaboration log):
 
 | State                                        | Web tests | API tests | Perf | Source                         |
 | -------------------------------------------- | --------- | --------- | ---- | ------------------------------ |
 | Phase 4 fix round, as committed in `6e9822c` | 615       | 369       | 7    | Log, Phase 4 fix-round outcome |
 | Phase 5 working tree, before review fixes    | 674       | 369       | 7    | Log, Phase 5 (passed twice)    |
+| Phase 5 after the review fix round           | 699       | 369       | 7    | 3 green runs (agent 2, me 1)   |
 
 Coverage thresholds 80/80/80/70 (lines/functions/statements/branches) are enforced in both
 workspaces by `npm run validate`; the last explicitly recorded percentages were 99.6% (web) and
@@ -564,19 +563,19 @@ keyboard walkthrough (T-038).
 
 ### 8.6 Current status and known issues
 
-Phase 5 (T-034..T-037) is implemented in the working tree, `validate` passed twice before the
-review, and the orchestrator verified it in Chrome. The end-of-phase review returned **CHANGES
-REQUESTED**, and the fix round is paused by the stakeholder. Open items:
+Phase 5 (T-034..T-037) is done. The end-of-phase review returned **CHANGES REQUESTED**; the fix
+round was paused by the stakeholder to write this document, then resumed and completed. Status of
+the findings and remaining caveats:
 
-| Severity | Finding                                                                                                                                                                                                                                          | Source           |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------- |
-| MAJOR    | The sort is re-announced after Back then Forward and after a dealership round trip (AC-011.3). The agent believed it fixed; its test only covered Back after a filter change. A one-shot request model (`useSortControl`) is in progress         | code-reviewer    |
-| MAJOR    | Search-draft race (pre-existing since Phase 2) can drop keystrokes under load: "-10" typed after "stk" became "stk10" in a loaded `validate` run. Missed by 5 earlier reviews. `useSearchDraft` now tracks its own pending commits (in progress) | code-reviewer    |
-| Gap      | The 60 s automatic poll is never exercised by a test; NFR-05/TA-14 are proven only by option values                                                                                                                                              | test-engineer    |
-| Gap      | AC-005.4 (KPIs above the fold at 1280x800) has no automated check; screenshots only, moved to T-042                                                                                                                                              | test-engineer    |
-| Caveat   | `MatchCount` silences polls by remounting the live region, which relies on common screen-reader behaviour; not tested with VoiceOver/NVDA                                                                                                        | Phase 2 review   |
-| Queued   | Nested `#inventory-list` region and whether paging should be announced (T-038)                                                                                                                                                                   | Phase 2/3 review |
-| Accepted | The MSW mock keeps the last value of a repeated query key (the API returns 400)                                                                                                                                                                  | Phase 1 review   |
+| Severity | Finding                                                                                                                                                                                                                                                                                       | Source           |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| Fixed    | MAJOR: the sort was re-announced after Back then Forward and after a dealership round trip (AC-011.3). The agent believed it fixed; its test only covered Back after a filter change. Now a one-shot request keyed by dealership; verified in Chrome (Back → Forward leaves the status empty) | code-reviewer    |
+| Fixed    | MAJOR: a search-draft race (since Phase 2) could drop keystrokes under load ("stk-10" became "stk10"). Missed by 5 earlier reviews. `useSearchDraft` now remembers its own pending commits; deterministic manual-clock tests; verified in Chrome at 6x CPU throttling ("stk-104" intact)      | code-reviewer    |
+| Fixed    | The 60 s poll is now exercised with fake timers (nothing before 60 s; summary, aging, list and open vehicle detail once; typed input and URL kept), plus a hidden-tab test (no poll, one refetch on focus). Both tests fail with a 30 s interval or background polling                        | test-engineer    |
+| Gap      | AC-005.4 (KPIs above the fold at 1280x800) has no automated check; screenshots only, moved to T-042                                                                                                                                                                                           | test-engineer    |
+| Caveat   | `MatchCount` silences polls by remounting the live region, which relies on common screen-reader behaviour; not tested with VoiceOver/NVDA                                                                                                                                                     | Phase 2 review   |
+| Queued   | Nested `#inventory-list` region and whether paging should be announced (T-038)                                                                                                                                                                                                                | Phase 2/3 review |
+| Accepted | The MSW mock keeps the last value of a repeated query key (the API returns 400)                                                                                                                                                                                                               | Phase 1 review   |
 
 ## 9. Scalability & future improvements
 
@@ -592,16 +591,15 @@ REQUESTED**, and the fix round is paused by the stakeholder. Open items:
 
 **Open Phase 6 work (in planned order):**
 
-1. Finish the Phase 5 fix round (the two MAJORs, an exercised poll test), then commit Phase 5.
-2. T-038 accessibility pass: full keyboard walkthrough, screen-reader check of the announcer model,
+1. T-038 accessibility pass: full keyboard walkthrough, screen-reader check of the announcer model,
    768 px, contrast, nested region.
-3. T-039 states and error matrix per region (MSW 500 / empty / slow; York with the real API).
-4. T-040 Storybook stories with `play` interactions for all feature states.
-5. T-041 README: run guide written (demo walkthrough, `APP_TODAY`, reset, troubleshooting); re-sync
+2. T-039 states and error matrix per region (MSW 500 / empty / slow; York with the real API).
+3. T-040 Storybook stories with `play` interactions for all feature states.
+4. T-041 README: run guide written (demo walkthrough, `APP_TODAY`, reset, troubleshooting); re-sync
    once Phase 5 is committed.
-6. T-042 (optional) Playwright: filter → log action → reload; dealership switch resets filters;
+5. T-042 (optional) Playwright: filter → log action → reload; dealership switch resets filters;
    an automated 1280x800 viewport check for AC-005.4.
-7. T-043/T-044 (optional) CSV export with formula-injection protection.
+6. T-043/T-044 (optional) CSV export with formula-injection protection.
 
 ## 10. AI-assisted development process
 
@@ -692,8 +690,8 @@ flowchart LR
 | 11  | "View all 19 aging vehicles" kept other filters and showed 3                                                                                                                                                                                                                                                                                                                          | Orchestrator, reading the agent's reported decision (T-024)                                                                                              | TA-29: the button replaces filters with `agingOnly=true`                                                                                                                                                                               |
 | 12  | Perf flake "fixed" by loosening budgets to 1 s / 500 ms; test timeout raised to 5 s                                                                                                                                                                                                                                                                                                   | code-reviewer called both masking; tester measured 4-7x slowdowns                                                                                        | Isolated perf run (cold < 750 ms, warm < 200 ms); root causes fixed, timeout back to 3 s                                                                                                                                               |
 | 13  | A name of only U+200B accepted; character counter in UTF-16 units (300 emoji → "600 / 500" but saved); `disabled` Save dropped keyboard focus                                                                                                                                                                                                                                         | code-reviewer (Phase 4)                                                                                                                                  | TA-30 `isBlankText` shared by API, form, mock; code-point counter; `aria-disabled`                                                                                                                                                     |
-| 14  | Sort announcement "fixed" for Back, but still re-announced on Back→Forward                                                                                                                                                                                                                                                                                                            | code-reviewer (Phase 5)                                                                                                                                  | Open MAJOR, fix in progress                                                                                                                                                                                                            |
-| 15  | Search draft race present since Phase 2, dropping keystrokes under load                                                                                                                                                                                                                                                                                                               | code-reviewer from a loaded `validate` log                                                                                                               | Open MAJOR, fix in progress                                                                                                                                                                                                            |
+| 14  | Sort announcement "fixed" for Back, but still re-announced on Back→Forward                                                                                                                                                                                                                                                                                                            | code-reviewer (Phase 5)                                                                                                                                  | Fixed in the Phase 5 fix round: a one-shot announcement request keyed by dealership                                                                                                                                                    |
+| 15  | Search draft race present since Phase 2, dropping keystrokes under load                                                                                                                                                                                                                                                                                                               | code-reviewer from a loaded `validate` log                                                                                                               | Fixed in the Phase 5 fix round: a one-shot announcement request keyed by dealership                                                                                                                                                    |
 | 16  | **Orchestrator's mistakes:** (a) brief asked for a centred dialog, contradicting ADR-006; (b) TRD note overstated a mutation result ("caught on both sides"); (c) parallel reviewer + tester wrote to the same `coverage/` dir; (d) an unformatted TRD edit silently stopped `validate` at the format check; (e) T-012 ticked before it was logged; (f) error message hard-coded "90" | (a) frontend agent flagged the conflict; (b) test-engineer; (c) both agents' `validate` failed; (d) re-reading output; (e) code-reviewer; (f) own review | (a) ADR kept, brief was wrong; (b) note corrected, `serverOnly` rows; (c) private `--coverage.reportsDirectory` for parallel agents; (d) formatted, check now part of the routine; (e) logged; (f) interpolates `AGING_THRESHOLD_DAYS` |
 
 ### 10.5 Human (stakeholder) decisions
@@ -706,7 +704,7 @@ flowchart LR
 | Commit granularity: commit verified Phase 1 web before i18n; one commit per layer per phase | Reviewable history (`feat(api)…`, `feat(web)…` with task ids) |
 | Keep the scaffold's `useUiStore` (recommendation was to remove it)                          | Kept unused; no sidebar                                       |
 | No sidebar                                                                                  | Single-page layout                                            |
-| Pause Phase 5 mid fix round                                                                 | Phase 5 uncommitted; status reported honestly here            |
+| Pause Phase 5 mid fix round to write this document first                                    | Docs committed first (`b676e27`); fix round resumed after     |
 
 Decisions the orchestrator took and recorded (not the stakeholder): keep ADR-006 over its own
 brief, TA-29, TA-31, TA-32, isolated perf budgets, accepting STK-1042 at £10,990 (AC-001.7 keeps its
@@ -720,12 +718,11 @@ own fixture).
   silent polls) relies on common behaviour.
 - **AC-005.4** (KPIs visible at 1280x800) is evidenced by screenshots only; no automated viewport
   test until T-042.
-- **The 60 s poll** is configured (query options) and refetches are tested manually and via
-  `refetchQueries`, but a timer-driven poll was neither exercised by an automated test nor
-  observed in the browser (a fake-timer test is part of the paused Phase 5 fix round).
+- **The 60 s poll** is tested with fake timers, but a timer-driven poll was not observed in a real
+  browser.
 - **jsdom dialog** is a stub; real focus behaviour was checked in Chrome only, not in Safari or
   Firefox.
 - **Bundle size** of the i18n addition was not measured separately.
 - **lint-staged hook** behaviour was proven in a throwaway repo; the local machine runs git 2.27.
-- **This document's test numbers** come from the log, not from a fresh run, and Phase 5 numbers
-  predate the open fix round.
+- **This document's test numbers** come from recorded `validate` runs, not a run made while
+  writing it.

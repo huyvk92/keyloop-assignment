@@ -1,5 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
+// The store module only, not the feature barrel: every test file loads this setup, and the barrel
+// would pull in the feature's components (dialog, form) for all of them.
+import { useLoggedByStore } from '@/features/vehicle-actions/store';
 import { i18n } from '@/i18n';
 import { resetMockActionStore } from '@/mocks/action-store';
 import { server } from '@/mocks/server';
@@ -35,8 +38,17 @@ if (typeof HTMLDialogElement.prototype.showModal !== 'function') {
   });
 }
 
+type ResettableStore<S> = {
+  getInitialState: () => S;
+  setState: (state: S, replace: true) => unknown;
+};
+const resetter =
+  <S>(store: ResettableStore<S>) =>
+  () =>
+    store.setState(store.getInitialState(), true);
+
 // Register every Zustand store here so each test starts from its initial state.
-const stores = [useUiStore];
+const storeResets = [resetter(useUiStore), resetter(useLoggedByStore)];
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 
@@ -45,8 +57,10 @@ afterEach(async () => {
   server.resetHandlers();
   // Actions POSTed through the default handlers must not leak into the next test.
   resetMockActionStore();
-  stores.forEach((store) => store.setState(store.getInitialState(), true));
-  // Tests render in English (ADR-009); a test that switches to Vietnamese is undone here.
+  storeResets.forEach((reset) => reset());
+  // After the store reset (a persisted store writes its reset state): nothing stored survives,
+  // e.g. the remembered "Logged by" name (T-037). Tests render in English (ADR-009); a test that
+  // switches to Vietnamese is undone here.
   window.localStorage.clear();
   await i18n.changeLanguage('en');
 });

@@ -105,7 +105,7 @@ describe('AgingSection', () => {
     const items = within(list).getAllByRole('listitem');
     expect(items.map((item) => item.textContent)).toEqual([
       'STK-0007Ford Focus200 daysPrice Reduction Planned',
-      'STK-0008Toyota Yaris150 daysNo action',
+      'STK-0008Toyota Yaris150 daysNo actionNeeds attention',
       'STK-0009Kia Ceed95 daysMarketing Promotion',
     ]);
     expect(
@@ -113,6 +113,18 @@ describe('AgingSection', () => {
     ).toBeVisible();
     // Items are not buttons unless a handler is given.
     expect(within(list).queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('labels only the vehicle without an action "Needs attention", as text (AC-010.1, BR-16)', async () => {
+    mockAging(() => HttpResponse.json(buildVehiclePage(threeAging, { pageSize: 10 })));
+    renderSection();
+
+    const list = await screen.findByRole('list', { name: 'Aging vehicles, oldest first' });
+    const [withAction, withoutAction, withOtherAction] = within(list).getAllByRole('listitem');
+    if (!withAction || !withoutAction || !withOtherAction) throw new Error('expected 3 items');
+    expect(within(withoutAction).getByText('Needs attention')).toBeVisible();
+    expect(within(withAction).queryByText('Needs attention')).not.toBeInTheDocument();
+    expect(within(withOtherAction).queryByText('Needs attention')).not.toBeInTheDocument();
   });
 
   it('pluralises the View all label for a single aging vehicle', async () => {
@@ -299,7 +311,7 @@ describe('AgingSection', () => {
           .map((item) => item.textContent),
       ).toEqual([
         'STK-0007Ford Focus200 ngàyDự kiến giảm giá',
-        'STK-0008Toyota Yaris150 ngàyChưa có hành động',
+        'STK-0008Toyota Yaris150 ngàyChưa có hành độngCần xử lý',
         'STK-0009Kia Ceed95 ngàyChạy khuyến mãi',
       ]),
     );

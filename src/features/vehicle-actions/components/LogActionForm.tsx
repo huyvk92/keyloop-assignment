@@ -20,6 +20,8 @@ import { StatusRadioGroup } from './StatusRadioGroup';
 type Props = {
   /** Saves the parsed (trimmed) body. Resolve on success; reject to show the error. */
   onSubmit: (body: CreateActionBody) => Promise<unknown>;
+  /** Initial "Logged by", e.g. the remembered name (US-012). Read once, at mount. */
+  defaultLoggedBy?: string;
 };
 
 type Outcome = { kind: 'saved' } | { kind: 'failed'; error: unknown } | null;
@@ -30,8 +32,10 @@ type Outcome = { kind: 'saved' } | { kind: 'failed'; error: unknown } | null;
  * on submit focus goes to the first invalid field, the status group first (AC-006.4).
  *
  * Default values are set once, at mount: the form is never fed query data, so a background
- * refetch can't reset what the user typed (AC-009.1). After a save, status and note are cleared
- * and "Logged by" is kept; after a failure every input keeps its value and Save retries (AC-006.7).
+ * refetch can't reset what the user typed (AC-009.1). "Logged by" starts with `defaultLoggedBy`
+ * and stays editable (AC-012.1). After a save, status and note are cleared and "Logged by" shows
+ * the saved (trimmed) name for the next entry; after a failure every input keeps its value and
+ * Save retries (AC-006.7).
  *
  * Focus: Save is never natively disabled while saving (`aria-disabled` + a guard here), so a
  * keyboard user doesn't fall back to `<body>`. On success focus stays where it was (usually Save,
@@ -39,7 +43,7 @@ type Outcome = { kind: 'saved' } | { kind: 'failed'; error: unknown } | null;
  * the error alert, which sits right above Save: the message is read and one Tab reaches Save to
  * retry (AC-006.7).
  */
-export function LogActionForm({ onSubmit }: Props) {
+export function LogActionForm({ onSubmit, defaultLoggedBy = '' }: Props) {
   const { t } = useTranslation();
   const { integer } = useFormatters();
   const [outcome, setOutcome] = useState<Outcome>(null);
@@ -49,14 +53,12 @@ export function LogActionForm({ onSubmit }: Props) {
   const {
     register,
     handleSubmit,
-    reset,
-    getValues,
-    setValue,
+    resetField,
     control,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(CreateActionBodySchema),
-    defaultValues: { note: '', loggedBy: '' },
+    defaultValues: { note: '', loggedBy: defaultLoggedBy },
   });
   // Code points of the trimmed note, as the contract counts them (Zod 4's max, SQLite length()):
   // an emoji is 1, not its 2 UTF-16 units.
@@ -74,11 +76,11 @@ export function LogActionForm({ onSubmit }: Props) {
       setOutcome(null);
       try {
         await onSubmit(body);
-        const loggedBy = getValues('loggedBy');
-        // Without values RHF also resets the native form, which is what unchecks the radios
-        // (`reset({ ... })` would read the still-checked radio back from the DOM).
-        reset();
-        setValue('loggedBy', loggedBy);
+        // Field by field: a radio reset to its (undefined) default is unchecked in the DOM too.
+        // The saved name becomes the field's default, so it isn't marked dirty.
+        resetField('status');
+        resetField('note');
+        resetField('loggedBy', { defaultValue: body.loggedBy });
         setOutcome({ kind: 'saved' });
       } catch (error) {
         setOutcome({ kind: 'failed', error });

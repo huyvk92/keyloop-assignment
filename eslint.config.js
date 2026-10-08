@@ -120,6 +120,25 @@ export default defineConfig([
     },
   },
   {
+    // The test setup registers every Zustand store for reset (src/test/setup.ts). It imports a
+    // feature's store module directly, so the barrel's components aren't loaded by every test file.
+    files: ['src/test/setup.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['../*'], message: 'Use the @/ alias instead of parent-relative imports.' },
+            {
+              group: ['@/features/*/*', '!@/features/*/store'],
+              message: 'Import other features only through their index.ts (@/features/<name>).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['src/test/**', 'src/**/*.stories.tsx', '.storybook/**'],
     rules: { 'react-refresh/only-export-components': 'off' },
   },

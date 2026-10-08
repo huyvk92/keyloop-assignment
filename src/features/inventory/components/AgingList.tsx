@@ -2,6 +2,7 @@ import type { VehicleListItem } from '@shared/api/vehicles';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { useFormatters } from '@/lib/use-formatters';
+import { AttentionBadge } from './AttentionBadge';
 
 type Props = {
   vehicles: VehicleListItem[];
@@ -13,7 +14,8 @@ const row = 'flex w-full flex-wrap items-baseline gap-x-3 gap-y-0.5 px-2 py-1.5 
 
 /**
  * Compact list of aging vehicles in the API's order (oldest first, BR-17): stock number,
- * make/model, days in stock and current action (BR-14). Two columns from `lg`, filled top to
+ * make/model, days in stock and current action (BR-14), plus a "Needs attention" text label when
+ * there is no action (BR-16, AC-010.1). Two columns from `lg`, filled top to
  * bottom so the reading order stays oldest first; keeps the section short so the KPIs and the
  * list stay near the fold (AC-005.4). Vehicle data is shown as stored; only the action status
  * label is translated (BR-19).
@@ -33,13 +35,14 @@ export function AgingList({ vehicles, onSelectVehicle }: Props) {
             </span>
             <span
               className={cn(
-                'w-full shrink-0 sm:w-48 sm:text-right',
+                'flex w-full shrink-0 flex-wrap items-center gap-x-2 gap-y-0.5 sm:w-60 sm:justify-end',
                 v.currentAction ? 'font-medium text-slate-900' : 'text-slate-600',
               )}
             >
               {v.currentAction
                 ? t(`actionStatus.${v.currentAction.status}`)
                 : t('inventory.table.noAction')}
+              {v.needsAttention && <AttentionBadge />}
             </span>
           </>
         );

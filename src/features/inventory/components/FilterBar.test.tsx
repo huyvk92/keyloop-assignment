@@ -134,6 +134,37 @@ describe('FilterBar', () => {
     expect(agingOnly).not.toBeChecked();
   });
 
+  it('toggles "Needs attention only" in the URL, combined with other filters (AC-010.1, BR-16)', async () => {
+    const requests = recordListRequests();
+    const { user, router } = renderFilterBar('?make=Ford&page=2');
+    await screen.findByText('6 vehicles match your filters');
+    const toggle = screen.getByRole('checkbox', { name: 'Needs attention only' });
+    expect(toggle).not.toBeChecked();
+
+    await user.click(toggle);
+
+    // Combines with make (AND, BR-05); a filter change returns to page 1 and pushes.
+    expect(router.state.location.search).toBe('?make=Ford&needsAttention=true');
+    expect(router.state.historyAction).toBe('PUSH');
+    // Ford: 3 aging, 1 of them with an action (fixtures), so 2 need attention.
+    expect(await screen.findByText('2 vehicles match your filters')).toHaveRole('status');
+    expect(requests.at(-1)?.get('needsAttention')).toBe('true');
+    expect(requests.at(-1)?.get('make')).toBe('Ford');
+    expect(toggle).toBeChecked();
+
+    // Unchecked means "no restriction" and leaves the URL (TA-27).
+    await user.click(toggle);
+    expect(router.state.location.search).toBe('?make=Ford');
+    expect(toggle).not.toBeChecked();
+  });
+
+  it('restores "Needs attention only" from the URL on reload', async () => {
+    renderFilterBar('?needsAttention=true');
+
+    expect(screen.getByRole('checkbox', { name: 'Needs attention only' })).toBeChecked();
+    expect(await screen.findByText('12 vehicles match your filters')).toBeVisible();
+  });
+
   describe('search (fake timers)', () => {
     afterEach(stopManualClock);
 
@@ -307,6 +338,7 @@ describe('FilterBar', () => {
     expect(
       within(region).getByRole('checkbox', { name: 'Chỉ xe tồn kho lâu (trên 90 ngày)' }),
     ).toBeVisible();
+    expect(within(region).getByRole('checkbox', { name: 'Chỉ xe cần xử lý' })).toBeVisible();
     expect(await within(region).findByText('6 xe khớp với bộ lọc')).toHaveRole('status');
   });
 

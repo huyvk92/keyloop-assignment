@@ -4,6 +4,7 @@ import {
   type VehicleListQuery,
 } from '@shared/api/vehicles';
 import { z } from 'zod';
+import { DEFAULT_SORT_ORDER } from './sort';
 
 /**
  * Dashboard URL state (ADR-008): filters, sort and page live in the search params, the
@@ -56,12 +57,21 @@ function isUrlKey(key: string): key is (typeof URL_KEYS)[number] {
   return (URL_KEYS as readonly string[]).includes(key);
 }
 
-/** Write a typed query as canonical search params: fixed order, no defaults (TA-09). */
+/** The sort key's own default order (TA-06) is left out too, so each sort has one URL. */
+const isDefaultOrder = (query: Partial<VehicleListQuery>) =>
+  query.order === DEFAULT_SORT_ORDER[query.sort ?? 'age'];
+
+/**
+ * Write a typed query as canonical search params: fixed order, no defaults (TA-09), and no
+ * `order` when it is the sort key's default (TA-06), e.g. `sort=price`, never
+ * `sort=price&order=asc`.
+ */
 export function toSearchParams(query: Partial<VehicleListQuery>): URLSearchParams {
   const params = new URLSearchParams();
   for (const key of URL_KEYS) {
     const value = query[key];
     if (value === undefined) continue;
+    if (key === 'order' && isDefaultOrder(query)) continue;
     const text = String(value);
     if (DEFAULTS[key] === text) continue;
     params.set(key, text);
@@ -94,7 +104,8 @@ export function fromSearchParams(params: URLSearchParams): Parsed {
     if (result.success) {
       const canonical = toSearchParams(result.data);
       // Parse the canonical form so the query (and its cache key) is the same before and after
-      // the URL is replaced, e.g. `agingOnly=false` and no `agingOnly` give one request, not two.
+      // the URL is replaced, e.g. `agingOnly=false` and no `agingOnly` give one request, not two,
+      // and a default `order` becomes `undefined` (`sort=price&order=asc` is `sort=price`).
       const query = VehicleListQuerySchema.parse(Object.fromEntries(canonical));
       return { query, search: canonical.toString() };
     }

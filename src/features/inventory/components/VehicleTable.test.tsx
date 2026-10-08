@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import { delay, http, HttpResponse } from 'msw';
-import { VehicleTable } from '@/features/inventory';
+import { FilterBar, VehicleTable } from '@/features/inventory';
 import { i18n } from '@/i18n';
 import { apiUrl } from '@/lib/http';
 import {
@@ -16,12 +16,24 @@ import { renderWithProviders } from '@/test/render';
 const birmingham = buildDealership({ id: 1, name: 'Birmingham' });
 const york = buildDealership({ id: 4, name: 'York' });
 const vehiclesUrl = (id: number) => apiUrl(`/dealerships/${id}/vehicles`);
+/**
+ * Text of every live status region. The table always holds one (empty until the user sorts,
+ * AC-011.3), so "nothing announced here" is `['']`.
+ */
+const statusTexts = () => screen.queryAllByRole('status').map((status) => status.textContent);
 
 function renderTable(dealership = birmingham, search = '') {
   return renderWithProviders(<VehicleTable dealership={dealership} />, {
     route: `/dealerships/${dealership.id}${search}`,
     path: '/dealerships/:dealershipId',
   });
+}
+
+/** The column headers' accessible names, in order (what a screen reader reads per cell). */
+function expectHeaderNames(table: HTMLElement, names: string[]) {
+  const headers = within(table).getAllByRole('columnheader');
+  expect(headers).toHaveLength(names.length);
+  headers.forEach((header, index) => expect(header).toHaveAccessibleName(names[index]));
 }
 
 const COLUMNS = [
@@ -64,11 +76,7 @@ describe('VehicleTable', () => {
     renderTable();
 
     const table = await screen.findByRole('table', { name: 'Vehicles in stock at Birmingham' });
-    expect(
-      within(table)
-        .getAllByRole('columnheader')
-        .map((th) => th.textContent),
-    ).toEqual(COLUMNS);
+    expectHeaderNames(table, COLUMNS);
     const [, row] = within(table).getAllByRole('row');
     if (!row) throw new Error('expected a data row');
     const cells = within(row)
@@ -105,6 +113,32 @@ describe('VehicleTable', () => {
     expect(within(agingRow).getByText('No action')).toBeVisible();
   });
 
+  it('labels only the aging vehicle without an action "Needs attention", as text (AC-010.1, BR-16)', async () => {
+    const neglected = buildVehicle({ id: 1, stockNumber: 'STK-0001', daysInStock: 120 });
+    const handled = buildVehicle({
+      id: 2,
+      stockNumber: 'STK-0002',
+      daysInStock: 130,
+      currentAction: buildCurrentAction(),
+    });
+    const fresh = buildVehicle({ id: 3, stockNumber: 'STK-0003', daysInStock: 30 });
+    server.use(
+      http.get(vehiclesUrl(1), () =>
+        HttpResponse.json(buildVehiclePage([neglected, handled, fresh])),
+      ),
+    );
+    renderTable();
+
+    const neglectedRow = await screen.findByRole('row', { name: /STK-0001/ });
+    expect(within(neglectedRow).getByText('Needs attention')).toBeVisible();
+    expect(within(neglectedRow).getByText('No action')).toBeVisible();
+    expect(screen.getAllByText('Needs attention')).toHaveLength(1);
+    // A fresh vehicle without an action is not aging, so it does not need attention (BR-16).
+    expect(
+      within(screen.getByRole('row', { name: /STK-0003/ })).getByText('No action'),
+    ).toBeVisible();
+  });
+
   it('shows the total and pages through the URL (AC-001.4)', async () => {
     const { user, router } = renderTable();
 
@@ -132,7 +166,7 @@ describe('VehicleTable', () => {
     const hint = await screen.findByText('Updating…');
     expect(hint).toBeVisible();
     expect(hint).not.toHaveAttribute('aria-live');
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(statusTexts()).toEqual(['']);
     expect(screen.getByRole('row', { name: /STK-1001/ })).toBeVisible();
   });
 
@@ -146,7 +180,7 @@ describe('VehicleTable', () => {
 
     await waitFor(() => expect(queryClient.isFetching()).toBe(1));
     expect(screen.queryByText('Updating…')).not.toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(statusTexts()).toEqual(['']);
     expect(announcements).toEqual([]);
   });
 
@@ -160,7 +194,7 @@ describe('VehicleTable', () => {
     expect(await screen.findByText(/couldn't refresh the list/i)).toBeVisible();
     expect(screen.getByRole('row', { name: /STK-1001/ })).toBeVisible();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(statusTexts()).toEqual(['']);
   });
 
   it('opens the page from the URL and replaces a page past the end with the last page (TA-05)', async () => {
@@ -175,7 +209,7 @@ describe('VehicleTable', () => {
     server.use(http.get(vehiclesUrl(1), () => delay('infinite')));
     renderTable();
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Loading vehicles…');
+    await waitFor(() => expect(statusTexts()).toEqual(['', 'Loading vehicles…']));
   });
 
   it('shows "No vehicles in stock" for a dealership without stock (AC-001.5)', async () => {
@@ -183,7 +217,7 @@ describe('VehicleTable', () => {
 
     // With no filters there is no match count to announce it, so the empty state is the status.
     expect(await screen.findByText('No vehicles in stock')).toBeVisible();
-    expect(screen.getByRole('status')).toHaveTextContent('No vehicles in stock');
+    expect(statusTexts()).toEqual(['', expect.stringContaining('No vehicles in stock')]);
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Pagination' })).not.toBeInTheDocument();
   });
@@ -244,11 +278,7 @@ describe('VehicleTable', () => {
       renderTable();
 
       const table = await screen.findByRole('table', { name: 'Xe tồn kho tại Birmingham' });
-      expect(
-        within(table)
-          .getAllByRole('columnheader')
-          .map((th) => th.textContent),
-      ).toEqual([
+      expectHeaderNames(table, [
         'Mã tồn kho',
         'Hãng xe',
         'Mẫu xe',
@@ -313,7 +343,7 @@ describe('VehicleTable', () => {
       server.use(http.get(vehiclesUrl(1), () => delay('infinite')));
       renderTable();
 
-      expect(await screen.findByRole('status')).toHaveTextContent('Đang tải danh sách xe…');
+      await waitFor(() => expect(statusTexts()).toEqual(['', 'Đang tải danh sách xe…']));
     });
   });
   it('adds a "View <stock number>" button per row when rows can be opened (AC-004.4)', async () => {
@@ -345,5 +375,250 @@ describe('VehicleTable', () => {
     });
 
     expect(await screen.findByRole('button', { name: 'Xem STK-1042' })).toHaveTextContent('Xem');
+  });
+
+  describe('sorting (US-011, T-036)', () => {
+    /** Records the main list requests (the default handler still answers). */
+    function recordListRequests() {
+      const requests: URLSearchParams[] = [];
+      server.use(
+        http.get(vehiclesUrl(1), ({ request }) => {
+          requests.push(new URL(request.url).searchParams);
+        }),
+      );
+      return requests;
+    }
+
+    const header = (name: string) => screen.getByRole('columnheader', { name });
+    const sortButton = (name: string) => screen.getByRole('button', { name });
+    const priceCells = () =>
+      within(screen.getByRole('table'))
+        .getAllByText(/^£[\d,.]+$/)
+        .map((cell) => Number(cell.textContent.replace(/[^\d]/g, '')));
+    /** [make, model] per body row, from the Make and Model columns (2nd and 3rd). */
+    const makeModels = () =>
+      within(screen.getByRole('table'))
+        .getAllByRole('row')
+        .slice(1)
+        .filter((row) => row instanceof HTMLTableRowElement)
+        .map((row) => [row.cells[1]?.textContent ?? '', row.cells[2]?.textContent ?? ''] as const);
+    /** Case-insensitive, code-unit order, like the API's COLLATE NOCASE. */
+    const nocase = (a: string, b: string) => {
+      const [x, y] = [a.toLowerCase(), b.toLowerCase()];
+      return x < y ? -1 : x > y ? 1 : 0;
+    };
+    const byMakeThenModel = (
+      [makeA, modelA]: readonly [string, string],
+      [makeB, modelB]: readonly [string, string],
+    ) => nocase(makeA, makeB) || nocase(modelA, modelB);
+
+    it('shows the default sort, days in stock descending, without announcing it (BR-17)', async () => {
+      const { announcements } = recordAnnouncements();
+      renderTable();
+      await screen.findByText('Showing 1-25 of 30');
+
+      expect(header('Days in stock')).toHaveAttribute('aria-sort', 'descending');
+      expect(header('List price')).not.toHaveAttribute('aria-sort');
+      expect(header('Make')).not.toHaveAttribute('aria-sort');
+      // Only these three columns are sortable.
+      expect(within(screen.getByRole('table')).getAllByRole('button')).toHaveLength(3);
+      expect(announcements).toEqual([]);
+    });
+
+    it('sorts by price ascending, then toggles to descending, through the URL (AC-011.1)', async () => {
+      const requests = recordListRequests();
+      const { user, router } = renderTable(birmingham, '?page=2');
+      await screen.findByText('Showing 26-30 of 30');
+
+      await user.click(sortButton('List price'));
+
+      // Ascending is price's default order (TA-06), so it stays out of the URL and the request.
+      expect(router.state.location.search).toBe('?sort=price');
+      expect(router.state.historyAction).toBe('PUSH');
+      await waitFor(() => expect(priceCells()).toHaveLength(25));
+      expect(requests.at(-1)?.get('sort')).toBe('price');
+      expect(requests.at(-1)?.has('order')).toBe(false);
+      expect(requests.at(-1)?.get('page')).toBe('1');
+      expect(header('List price')).toHaveAttribute('aria-sort', 'ascending');
+      expect(header('Days in stock')).not.toHaveAttribute('aria-sort');
+      await waitFor(() => expect(priceCells()).toEqual([...priceCells()].sort((a, b) => a - b)));
+
+      await user.click(sortButton('List price'));
+
+      expect(router.state.location.search).toBe('?sort=price&order=desc');
+      expect(requests.at(-1)?.get('order')).toBe('desc');
+      expect(header('List price')).toHaveAttribute('aria-sort', 'descending');
+      await waitFor(() => expect(priceCells()).toEqual([...priceCells()].sort((a, b) => b - a)));
+      // Keyboard focus stays on the header button.
+      expect(sortButton('List price')).toHaveFocus();
+    });
+
+    it('sorts by make and model A-Z from the Make header (AC-011.2)', async () => {
+      const requests = recordListRequests();
+      const { user, router } = renderTable();
+      await screen.findByText('Showing 1-25 of 30');
+
+      // The button is named by its visible label; what it sorts by is its description.
+      expect(sortButton('Make')).toHaveAccessibleDescription('Sorts by make, then model');
+      await user.click(sortButton('Make'));
+
+      expect(router.state.location.search).toBe('?sort=makeModel');
+      expect(requests.at(-1)?.get('sort')).toBe('makeModel');
+      expect(header('Make')).toHaveAttribute('aria-sort', 'ascending');
+      // The rows really are in make, then model, A-Z order.
+      await waitFor(() => expect(screen.queryByText('Updating…')).not.toBeInTheDocument());
+      const shown = makeModels();
+      expect(shown).toHaveLength(25);
+      expect(shown).toEqual([...shown].sort(byMakeThenModel));
+      expect(new Set(shown.map(([make]) => make)).size).toBeGreaterThan(1);
+      // Within one make, the models are ordered too (not only the makes).
+      const firstMake = shown.filter(([make]) => make === shown[0]?.[0]);
+      expect(new Set(firstMake.map(([, model]) => model)).size).toBeGreaterThan(1);
+    });
+
+    it('returns to the default URL when Days in stock is chosen again (TA-09)', async () => {
+      const { user, router } = renderTable(birmingham, '?sort=price&order=desc');
+      await screen.findByText('Showing 1-25 of 30');
+
+      await user.click(sortButton('Days in stock'));
+      expect(router.state.location.search).toBe('');
+      expect(header('Days in stock')).toHaveAttribute('aria-sort', 'descending');
+
+      await user.click(sortButton('Days in stock'));
+      expect(router.state.location.search).toBe('?order=asc');
+      expect(header('Days in stock')).toHaveAttribute('aria-sort', 'ascending');
+    });
+
+    it('restores the sort from the URL on reload (AC-011.3)', async () => {
+      const url = '?sort=price&order=desc';
+      const { unmount } = renderTable(birmingham, url);
+      await screen.findByText('Showing 1-25 of 30');
+      const prices = priceCells();
+      unmount();
+
+      renderTable(birmingham, url);
+
+      await screen.findByText('Showing 1-25 of 30');
+      expect(header('List price')).toHaveAttribute('aria-sort', 'descending');
+      expect(priceCells()).toEqual(prices);
+    });
+
+    it('announces exactly one polite message per sort change, and the match count stays silent (AC-011.3)', async () => {
+      const { user } = renderWithProviders(
+        <>
+          <FilterBar dealershipId={1} />
+          <VehicleTable dealership={birmingham} />
+        </>,
+        { route: '/dealerships/1?make=Ford', path: '/dealerships/:dealershipId' },
+      );
+      await screen.findByText('6 vehicles match your filters');
+      await screen.findByText('Showing 1-6 of 6');
+      const { announcements } = recordAnnouncements();
+
+      await user.click(sortButton('List price'));
+      await waitFor(() => expect(header('List price')).toHaveAttribute('aria-sort', 'ascending'));
+      await waitFor(() => expect(screen.queryByText('Updating…')).not.toBeInTheDocument());
+      expect(announcements).toEqual(['Sorted by price, ascending']);
+
+      await user.click(sortButton('List price'));
+      await waitFor(() => expect(screen.queryByText('Updating…')).not.toBeInTheDocument());
+      await user.click(sortButton('Make'));
+      await waitFor(() => expect(screen.queryByText('Updating…')).not.toBeInTheDocument());
+
+      expect(announcements).toEqual([
+        'Sorted by price, ascending',
+        'Sorted by price, descending',
+        'Sorted by make and model, ascending',
+      ]);
+      // The count is unchanged by a sort, so it never spoke.
+      expect(screen.getByText('6 vehicles match your filters')).toHaveRole('status');
+    });
+
+    it('does not repeat the sort announcement for a filter change, Back or a language switch', async () => {
+      const { user, router } = renderWithProviders(
+        <>
+          <FilterBar dealershipId={1} />
+          <VehicleTable dealership={birmingham} />
+        </>,
+        { route: '/dealerships/1', path: '/dealerships/:dealershipId' },
+      );
+      await screen.findByText('30 vehicles in stock');
+      await user.click(sortButton('List price'));
+      await screen.findByText('Sorted by price, ascending');
+      const { announcements } = recordAnnouncements();
+
+      await user.selectOptions(screen.getByRole('combobox', { name: 'Make' }), 'Ford');
+      await screen.findByText('6 vehicles match your filters');
+      await act(() => router.navigate(-1));
+      await screen.findByText('30 vehicles in stock');
+      await act(() => i18n.changeLanguage('vi'));
+      await screen.findByText('30 xe trong kho');
+
+      // Only the match count spoke (for the filter change); the sort status did not.
+      expect(announcements.filter((text) => /sort|sắp xếp/i.test(text))).toEqual([]);
+    });
+
+    it('does not announce a sort again on Back then Forward (AC-011.3)', async () => {
+      const { user, router } = renderTable();
+      await screen.findByText('Showing 1-25 of 30');
+      const { announcements } = recordAnnouncements();
+      await user.click(sortButton('List price'));
+      await waitFor(() => expect(announcements).toEqual(['Sorted by price, ascending']));
+
+      await act(() => router.navigate(-1));
+      await waitFor(() =>
+        expect(header('Days in stock')).toHaveAttribute('aria-sort', 'descending'),
+      );
+      await act(() => router.navigate(1));
+      await waitFor(() => expect(header('List price')).toHaveAttribute('aria-sort', 'ascending'));
+      await waitFor(() => expect(screen.queryByText('Updating…')).not.toBeInTheDocument());
+
+      expect(announcements).toEqual(['Sorted by price, ascending']);
+      expect(statusTexts()).toEqual(['']);
+    });
+
+    it('announces a fresh sort click after Back once (AC-011.3)', async () => {
+      const { user, router } = renderTable();
+      await screen.findByText('Showing 1-25 of 30');
+      await user.click(sortButton('List price'));
+      await screen.findByText('Sorted by price, ascending');
+      await act(() => router.navigate(-1));
+      await waitFor(() =>
+        expect(header('Days in stock')).toHaveAttribute('aria-sort', 'descending'),
+      );
+      const { announcements } = recordAnnouncements();
+
+      await user.click(sortButton('List price'));
+
+      await waitFor(() => expect(header('List price')).toHaveAttribute('aria-sort', 'ascending'));
+      await waitFor(() => expect(screen.queryByText('Updating…')).not.toBeInTheDocument());
+      expect(announcements).toEqual(['Sorted by price, ascending']);
+    });
+
+    it('announces the sort in Vietnamese (BR-19)', async () => {
+      await i18n.changeLanguage('vi');
+      const requests = recordListRequests();
+      const { user } = renderTable();
+      await screen.findByText('Hiển thị 1-25 / 30');
+      const { announcements } = recordAnnouncements();
+
+      await user.click(screen.getByRole('button', { name: 'Giá niêm yết' }));
+
+      await waitFor(() => expect(announcements).toEqual(['Đã sắp xếp theo giá, tăng dần']));
+      // Same request as in English: the language never reaches the API.
+      expect(requests.at(-1)?.toString()).toBe('sort=price&page=1&pageSize=25');
+
+      await user.click(screen.getByRole('button', { name: 'Số ngày tồn kho' }));
+      await waitFor(() =>
+        expect(announcements.at(-1)).toBe('Đã sắp xếp theo số ngày tồn kho, giảm dần'),
+      );
+      const make = screen.getByRole('button', { name: 'Hãng xe' });
+      expect(make).toHaveAccessibleDescription('Sắp xếp theo hãng xe, rồi theo mẫu xe');
+      await user.click(make);
+      await waitFor(() =>
+        expect(announcements.at(-1)).toBe('Đã sắp xếp theo hãng xe và mẫu xe, tăng dần'),
+      );
+      expect(announcements).toHaveLength(3);
+    });
   });
 });
