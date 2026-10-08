@@ -250,3 +250,146 @@ describe('inventory service getFacets', () => {
     expect(() => service().getFacets(dealershipId + 1)).toThrow(NotFoundError);
   });
 });
+
+describe('inventory service getSummary (T-022)', () => {
+  const addVehicles = (ages: number[], id = dealershipId) =>
+    ages.map((ageDays) => insertVehicle(db, { dealershipId: id, ageDays }));
+
+  it('gives 8 / 3 / 37.5 / 75 for ages 10..200 (AC-005.1, TA-21: 601 / 8 = 75.125)', () => {
+    addVehicles([10, 20, 30, 40, 90, 91, 120, 200]);
+
+    expect(service().getSummary(dealershipId)).toEqual({
+      asOfDate: '2026-10-07',
+      totalVehicles: 8,
+      agingCount: 3,
+      agingPercent: 37.5,
+      averageDaysInStock: 75,
+      needsAttentionCount: 3,
+    });
+  });
+
+  it('gives 0 / 0 / 0 / null for a dealership with no vehicles (AC-005.3)', () => {
+    expect(service().getSummary(dealershipId)).toEqual({
+      asOfDate: '2026-10-07',
+      totalVehicles: 0,
+      agingCount: 0,
+      agingPercent: 0,
+      averageDaysInStock: null,
+      needsAttentionCount: 0,
+    });
+  });
+
+  it('counts aging vehicles without an action as needing attention (AC-010.1, BR-16)', () => {
+    const [acted, actedTwice] = addVehicles([91, 150, 200, 90]);
+    insertAction(db, { vehicleId: acted! });
+    insertAction(db, { vehicleId: actedTwice! });
+    insertAction(db, { vehicleId: actedTwice!, loggedAt: '2026-10-07T11:00:00.000Z' });
+
+    const summary = service().getSummary(dealershipId);
+
+    expect([summary.agingCount, summary.needsAttentionCount]).toEqual([3, 1]);
+  });
+
+  it.each([
+    ['2 of 3 rounds to 66.7', [91, 100, 10], 66.7],
+    ['1 of 3 rounds to 33.3', [91, 0, 0], 33.3],
+    ['1 of 8 is 12.5', [91, 0, 0, 0, 0, 0, 0, 0], 12.5],
+    ['all aging is 100', [91, 200], 100],
+  ])('rounds agingPercent to 1 dp: %s (TA-21)', (_label, ages, expected) => {
+    addVehicles(ages);
+
+    expect(service().getSummary(dealershipId).agingPercent).toBe(expected);
+  });
+
+  // Divide-first rounding (count / total * 1000) loses these to binary floating point:
+  // 0.5025 * 1000 = 502.49999..., so a half-up 50.25 came out as 50.2.
+  it.each([
+    [201, 400, 50.3],
+    [203, 400, 50.8],
+    [1001, 2000, 50.1],
+    [1, 16, 6.3],
+    [1, 2001, 0],
+    [2000, 2001, 100],
+  ])(
+    'rounds %i of %i aging half up to %s percent without float error (TA-21)',
+    (aging, total, expected) => {
+      db.transaction(() =>
+        addVehicles(Array.from({ length: total }, (_, i) => (i < aging ? 91 : 0))),
+      )();
+
+      expect(service().getSummary(dealershipId).agingPercent).toBe(expected);
+    },
+  );
+
+  it.each([
+    ['exactly .5 rounds up', [0, 1], 1],
+    ['90.5 rounds up to 91', [90, 91], 91],
+    ['.33 rounds down', [91, 0, 0], 30],
+  ])('rounds averageDaysInStock half up: %s (TA-21)', (_label, ages, expected) => {
+    addVehicles(ages);
+
+    expect(service().getSummary(dealershipId).averageDaysInStock).toBe(expected);
+  });
+
+  it('counts a future-dated vehicle as age 0 in the average (BR-01, TA-22)', () => {
+    insertVehicle(db, { dealershipId, stockInDate: '2026-11-06' }); // 30 days ahead
+    addVehicles([10]);
+
+    expect(service().getSummary(dealershipId)).toMatchObject({
+      totalVehicles: 2,
+      averageDaysInStock: 5,
+    });
+  });
+
+  it("only counts the dealership's own stock (BR-04)", () => {
+    const other = insertDealership(db);
+    addVehicles([200, 200, 200], other);
+    addVehicles([10]);
+
+    expect(service().getSummary(dealershipId)).toMatchObject({
+      totalVehicles: 1,
+      agingCount: 0,
+      averageDaysInStock: 10,
+    });
+  });
+
+  it('turns 90 days into aging when the clock moves one day (BR-03)', () => {
+    insertVehicle(db, { dealershipId, stockInDate: '2026-07-09' });
+
+    const today = service(fixedClock('2026-10-07')).getSummary(dealershipId);
+    const tomorrow = service(fixedClock('2026-10-08')).getSummary(dealershipId);
+
+    expect([today.asOfDate, today.agingCount, today.averageDaysInStock]).toEqual([
+      '2026-10-07',
+      0,
+      90,
+    ]);
+    expect([tomorrow.asOfDate, tomorrow.agingCount, tomorrow.averageDaysInStock]).toEqual([
+      '2026-10-08',
+      1,
+      91,
+    ]);
+  });
+
+  it('uses the dealership-local date late in the evening (TA-01, AC-003.5)', () => {
+    // 23:30 UTC on 7 Oct is 00:30 BST on 8 Oct in London, but 19:30 EDT on 7 Oct in New York
+    const newYork = insertDealership(db, { timeZone: 'America/New_York' });
+    insertVehicle(db, { dealershipId, stockInDate: '2026-07-09' });
+    insertVehicle(db, { dealershipId: newYork, stockInDate: '2026-07-09' });
+    const lateEvening: Clock = { now: () => new Date('2026-10-07T23:30:00Z') };
+
+    const london = service(lateEvening).getSummary(dealershipId);
+    const ny = service(lateEvening).getSummary(newYork);
+
+    expect([london.asOfDate, london.agingCount, london.averageDaysInStock]).toEqual([
+      '2026-10-08',
+      1,
+      91,
+    ]);
+    expect([ny.asOfDate, ny.agingCount, ny.averageDaysInStock]).toEqual(['2026-10-07', 0, 90]);
+  });
+
+  it('throws NotFoundError for an unknown dealership', () => {
+    expect(() => service().getSummary(dealershipId + 1)).toThrow(NotFoundError);
+  });
+});

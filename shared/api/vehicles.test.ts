@@ -4,6 +4,7 @@ import {
   AGE_RANGE_ERROR_MESSAGE,
   AgeRangeFormSchema,
   FacetsResponseSchema,
+  InventorySummarySchema,
   MAX_AGE_DAYS,
   PAGE_SIZE_DEFAULT,
   PAGE_SIZE_MAX,
@@ -268,5 +269,56 @@ describe('FacetsResponseSchema', () => {
     expect(FacetsResponseSchema.parse(body)).toEqual(body);
     expect(FacetsResponseSchema.parse({ makes: [] })).toEqual({ makes: [] });
     expect(FacetsResponseSchema.safeParse({ makes: [{ make: 'Ford' }] }).success).toBe(false);
+  });
+});
+
+describe('InventorySummarySchema (T-021)', () => {
+  const summary = {
+    asOfDate: '2026-10-07',
+    totalVehicles: 8,
+    agingCount: 3,
+    agingPercent: 37.5,
+    averageDaysInStock: 75,
+    needsAttentionCount: 2,
+  };
+
+  it('parses the AC-005.1 summary', () => {
+    expect(InventorySummarySchema.parse(summary)).toEqual(summary);
+  });
+
+  it('allows averageDaysInStock null for an empty stock (AC-005.3)', () => {
+    const empty = {
+      ...summary,
+      totalVehicles: 0,
+      agingCount: 0,
+      agingPercent: 0,
+      averageDaysInStock: null,
+      needsAttentionCount: 0,
+    };
+
+    expect(InventorySummarySchema.parse(empty)).toEqual(empty);
+  });
+
+  it('accepts agingPercent 0 and 100 and rejects values outside 0-100', () => {
+    for (const agingPercent of [0, 66.7, 100]) {
+      expect(InventorySummarySchema.safeParse({ ...summary, agingPercent }).success).toBe(true);
+    }
+    for (const agingPercent of [100.1, -0.1]) {
+      expect(InventorySummarySchema.safeParse({ ...summary, agingPercent }).success).toBe(false);
+    }
+  });
+
+  it('rejects a fractional or negative average, negative counts and a non-ISO date', () => {
+    const invalid = [
+      { averageDaysInStock: 75.1 },
+      { averageDaysInStock: -1 },
+      { totalVehicles: -1 },
+      { agingCount: 1.5 },
+      { needsAttentionCount: -1 },
+      { asOfDate: '07/10/2026' },
+    ];
+    for (const override of invalid) {
+      expect(InventorySummarySchema.safeParse({ ...summary, ...override }).success).toBe(false);
+    }
   });
 });

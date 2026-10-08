@@ -1,5 +1,6 @@
 import type {
   FacetsResponse,
+  InventorySummary,
   SortKey,
   SortOrder,
   VehicleListItem,
@@ -10,8 +11,13 @@ import type { Clock } from '../../lib/clock';
 import { localDate } from '../../lib/dates';
 import { NotFoundError } from '../../lib/errors';
 import type { DealershipsRepository } from '../dealerships/dealerships.repository';
-import type { InventoryRepository, MakeModelRow, VehicleRow } from './inventory.repository';
-import { ageFilterToDateRange, ageInDays, isAging } from './vehicle-age';
+import type {
+  InventoryRepository,
+  MakeModelRow,
+  SummaryTotals,
+  VehicleRow,
+} from './inventory.repository';
+import { ageFilterToDateRange, agingCutoffDate, ageInDays, isAging } from './vehicle-age';
 
 type Deps = {
   dealerships: DealershipsRepository;
@@ -61,6 +67,24 @@ function toFacets(rows: MakeModelRow[]): FacetsResponse {
   return { makes };
 }
 
+/**
+ * KPI rounding (TA-21): percent to 1 dp, average to a whole day; Math.round is half up for these
+ * non-negative values. Multiply before dividing: (count / total) * 1000 picks up binary float
+ * error (201 / 400 gave 502.4999... and so 50.2 instead of 50.3). An empty stock gives 0 % and a null average (BR-15, AC-005.3).
+ */
+function toSummary(totals: SummaryTotals, asOfDate: string): InventorySummary {
+  const { totalVehicles, agingCount, totalDaysInStock, needsAttentionCount } = totals;
+  const empty = totalVehicles === 0;
+  return {
+    asOfDate,
+    totalVehicles,
+    agingCount,
+    agingPercent: empty ? 0 : Math.round((agingCount * 1000) / totalVehicles) / 10,
+    averageDaysInStock: empty ? null : Math.round(totalDaysInStock / totalVehicles),
+    needsAttentionCount,
+  };
+}
+
 export function createInventoryService({ dealerships, inventory, clock }: Deps) {
   function requireDealership(dealershipId: number) {
     const dealership = dealerships.findById(dealershipId);
@@ -73,6 +97,18 @@ export function createInventoryService({ dealerships, inventory, clock }: Deps) 
     getFacets(dealershipId: number): FacetsResponse {
       requireDealership(dealershipId);
       return toFacets(inventory.listMakeModels(dealershipId));
+    },
+
+    /** KPIs over the whole in-stock inventory, as of the dealership-local today (BR-15, BR-16). */
+    getSummary(dealershipId: number): InventorySummary {
+      const dealership = requireDealership(dealershipId);
+      const today = localDate(clock.now(), dealership.timeZone);
+      const totals = inventory.summaryTotals({
+        dealershipId,
+        today,
+        agingCutoff: agingCutoffDate(today),
+      });
+      return toSummary(totals, today);
     },
 
     listVehicles(dealershipId: number, query: VehicleListQuery): VehicleListResponse {

@@ -97,6 +97,39 @@ const SELECT_COUNT = 'SELECT COUNT(*) FROM vehicles v';
 
 export type MakeModelRow = { make: string; model: string };
 
+/** Whole-stock aggregates for the KPI summary; percent and average are derived in the service. */
+export type SummaryTotals = {
+  totalVehicles: number;
+  agingCount: number;
+  /** Sum of ages in days, each clamped at 0 (BR-01, TA-22). */
+  totalDaysInStock: number;
+  needsAttentionCount: number;
+};
+
+export type SummaryQuery = {
+  dealershipId: number;
+  /** Dealership-local "today" (YYYY-MM-DD) computed by the service (ADR-002). */
+  today: string;
+  /** Latest aging stock-in date (`stock_in_date <= agingCutoff` = aging, BR-02). */
+  agingCutoff: string;
+};
+
+/**
+ * One statement for every KPI (TRD §4.3). The aging and needs-attention predicates are the list's
+ * own filter fragments (`stockInTo` bound to the aging cutoff, `withoutAction`), so the counts
+ * always equal the `agingOnly=true` / `needsAttention=true` list totals (BR-16). `julianday` on
+ * date-only strings is DST-free; the CAST keeps the sum an exact integer.
+ */
+const SUMMARY_SQL = `
+  SELECT COUNT(*) AS totalVehicles,
+         COALESCE(SUM(${FILTER_SQL.stockInTo}), 0) AS agingCount,
+         COALESCE(SUM(CAST(max(0, julianday(@today) - julianday(v.stock_in_date)) AS INTEGER)), 0)
+           AS totalDaysInStock,
+         COALESCE(SUM(${FILTER_SQL.stockInTo} AND ${FILTER_SQL.withoutAction}), 0)
+           AS needsAttentionCount
+  FROM vehicles v
+  WHERE v.dealership_id = @dealershipId`;
+
 type SqlParams = Record<string, string | number>;
 
 /** Active filter keys and their named parameters. */
@@ -133,7 +166,18 @@ export function createInventoryRepository(db: Db) {
      ORDER BY make COLLATE NOCASE, make, model COLLATE NOCASE, model`,
   );
 
+  const summaryStatement = db.prepare<
+    [{ dealershipId: number; today: string; stockInTo: string }],
+    SummaryTotals
+  >(SUMMARY_SQL);
+
   return {
+    /** KPI aggregates over the dealership's whole stock; no list filters apply (BR-15). */
+    summaryTotals({ dealershipId, today, agingCutoff }: SummaryQuery): SummaryTotals {
+      // COUNT/SUM without GROUP BY always yields exactly one row.
+      return summaryStatement.get({ dealershipId, today, stockInTo: agingCutoff })!;
+    },
+
     /** Distinct make/model pairs in the dealership's stock, make then model A-Z ignoring case (BR-06). */
     listMakeModels(dealershipId: number): MakeModelRow[] {
       return makeModelStatement.all(dealershipId);

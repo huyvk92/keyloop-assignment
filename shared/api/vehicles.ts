@@ -110,3 +110,23 @@ export const FacetsResponseSchema = z.object({
 });
 export type FacetsResponse = z.infer<typeof FacetsResponseSchema>;
 export type MakeFacet = FacetsResponse['makes'][number];
+
+/**
+ * GET /api/dealerships/:dealershipId/summary - KPIs over the dealership's whole in-stock
+ * inventory; list filters never apply (BR-15, AC-005.2). Rounding per TA-21: `agingPercent` to
+ * 1 dp, `averageDaysInStock` to a whole day (half up). Empty stock gives 0 / 0 / 0 / null.
+ */
+export const InventorySummarySchema = z.object({
+  /** The dealership-local "today" the ages were computed for (TA-01). */
+  asOfDate: z.iso.date(),
+  totalVehicles: z.number().int().nonnegative(),
+  /** Vehicles older than AGING_THRESHOLD_DAYS (BR-02). */
+  agingCount: z.number().int().nonnegative(),
+  /** 0-100, one decimal place; 0 when there are no vehicles. */
+  agingPercent: z.number().min(0).max(100),
+  /** Mean of the (never negative) ages; null when there are no vehicles (shown as "-"). */
+  averageDaysInStock: z.number().int().nonnegative().nullable(),
+  /** Aging and no current action (BR-16); equals the `needsAttention=true` list total. */
+  needsAttentionCount: z.number().int().nonnegative(),
+});
+export type InventorySummary = z.infer<typeof InventorySummarySchema>;

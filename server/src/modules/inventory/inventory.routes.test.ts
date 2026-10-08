@@ -1,7 +1,12 @@
 import { ApiErrorSchema } from '@shared/api/common';
-import { FacetsResponseSchema, VehicleListResponseSchema } from '@shared/api/vehicles';
+import {
+  FacetsResponseSchema,
+  InventorySummarySchema,
+  VehicleListResponseSchema,
+} from '@shared/api/vehicles';
 import { insertAction, insertDealership, insertVehicle } from '../../../test/factories';
 import { createTestApp } from '../../../test/helpers';
+import { inventorySeeder } from './inventory.seed';
 
 type TestApp = Awaited<ReturnType<typeof createTestApp>>;
 let ctx: TestApp;
@@ -603,5 +608,156 @@ describe('GET /api/dealerships/:dealershipId/facets (T-016)', () => {
       '/api/dealerships/{dealershipId}/facets',
       'get',
     ]);
+  });
+});
+
+describe('GET /api/dealerships/:dealershipId/summary (T-022)', () => {
+  const summary = (id: number | string = dealershipId, query = '') =>
+    ctx.app.inject({ method: 'GET', url: `/api/dealerships/${id}/summary${query}` });
+  async function summaryOk(id: number | string = dealershipId, query = '') {
+    const response = await summary(id, query);
+    expect(response.statusCode).toBe(200);
+    return InventorySummarySchema.parse(response.json());
+  }
+  const addVehicles = (ages: number[]) =>
+    ages.map((ageDays) => insertVehicle(ctx.db, { dealershipId, ageDays }));
+
+  it('returns 8 / 3 / 37.5 / 75 for ages 10..200 (AC-005.1)', async () => {
+    addVehicles([10, 20, 30, 40, 90, 91, 120, 200]);
+
+    expect(await summaryOk()).toEqual({
+      asOfDate: '2026-10-07',
+      totalVehicles: 8,
+      agingCount: 3,
+      agingPercent: 37.5,
+      averageDaysInStock: 75,
+      needsAttentionCount: 3,
+    });
+  });
+
+  it('returns 0 / 0 / 0 / null for a dealership with no vehicles (AC-005.3)', async () => {
+    expect(await summaryOk()).toEqual({
+      asOfDate: '2026-10-07',
+      totalVehicles: 0,
+      agingCount: 0,
+      agingPercent: 0,
+      averageDaysInStock: null,
+      needsAttentionCount: 0,
+    });
+  });
+
+  it('counts 1 needing attention of 3 aging when 2 have an action (AC-010.1, BR-16)', async () => {
+    const [first, second] = addVehicles([91, 120, 200, 30]);
+    insertAction(ctx.db, { vehicleId: first! });
+    insertAction(ctx.db, { vehicleId: second! });
+
+    expect(await summaryOk()).toMatchObject({ agingCount: 3, needsAttentionCount: 1 });
+  });
+
+  it('rounds 2 of 3 aging to 66.7 (TA-21)', async () => {
+    addVehicles([91, 100, 10]);
+
+    expect((await summaryOk()).agingPercent).toBe(66.7);
+  });
+
+  it('counts a future-dated vehicle as age 0 in the average (TA-22)', async () => {
+    insertVehicle(ctx.db, { dealershipId, stockInDate: '2026-11-06' });
+    addVehicles([10]);
+
+    expect((await summaryOk()).averageDaysInStock).toBe(5);
+  });
+
+  it('ignores a filter query string: KPIs cover the whole stock (AC-005.2, BR-15)', async () => {
+    insertVehicle(ctx.db, { dealershipId, ageDays: 200, make: 'Ford' });
+    insertVehicle(ctx.db, { dealershipId, ageDays: 10, make: 'Kia' });
+    const whole = await summaryOk();
+
+    for (const query of [
+      '?make=Kia',
+      '?ageBucket=over-90&agingOnly=true',
+      '?needsAttention=true&q=zzz&page=9',
+      '?pageSize=101&minAge=100&maxAge=50', // invalid for the list, still ignored here
+      '?make=Ford&make=Kia',
+    ]) {
+      expect(await summaryOk(dealershipId, query)).toEqual(whole);
+    }
+    expect(whole).toMatchObject({ totalVehicles: 2, agingCount: 1 });
+  });
+
+  it('reports asOfDate in the dealership time zone (TA-01)', async () => {
+    // 23:30 UTC on 7 Oct is already 8 Oct in London (BST)
+    const late = await createTestApp({ clock: { now: () => new Date('2026-10-07T23:30:00Z') } });
+    try {
+      const london = insertDealership(late.db, { timeZone: 'Europe/London' });
+      const newYork = insertDealership(late.db, { timeZone: 'America/New_York' });
+      insertVehicle(late.db, { dealershipId: london, stockInDate: '2026-07-09' });
+      insertVehicle(late.db, { dealershipId: newYork, stockInDate: '2026-07-09' });
+      const get = async (id: number) =>
+        InventorySummarySchema.parse(
+          (await late.app.inject({ method: 'GET', url: `/api/dealerships/${id}/summary` })).json(),
+        );
+
+      expect(await get(london)).toMatchObject({ asOfDate: '2026-10-08', agingCount: 1 });
+      expect(await get(newYork)).toMatchObject({ asOfDate: '2026-10-07', agingCount: 0 });
+    } finally {
+      await late.close();
+    }
+  });
+
+  it('returns 404 NOT_FOUND for an unknown dealership', async () => {
+    const response = await summary(9999);
+
+    expect(response.statusCode).toBe(404);
+    expect(ApiErrorSchema.parse(response.json()).error.code).toBe('NOT_FOUND');
+  });
+
+  it.each(['abc', '0', '1e2', '-1'])(
+    'returns 400 VALIDATION_ERROR for the dealershipId %s',
+    async (id) => {
+      const response = await summary(id);
+
+      expect(response.statusCode).toBe(400);
+      expect(ApiErrorSchema.parse(response.json()).error.code).toBe('VALIDATION_ERROR');
+    },
+  );
+
+  it('is documented in the OpenAPI spec', async () => {
+    const response = await ctx.app.inject({ method: 'GET', url: '/api/docs/json' });
+
+    expect(response.json()).toHaveProperty([
+      'paths',
+      '/api/dealerships/{dealershipId}/summary',
+      'get',
+    ]);
+  });
+});
+
+describe('summary agrees with the list on the seeded data (BR-15, BR-16)', () => {
+  it('agingCount and needsAttentionCount equal the agingOnly / needsAttention list totals', async () => {
+    const seeded = await createTestApp({ today: '2026-10-07', seeders: [inventorySeeder] });
+    try {
+      const get = async (url: string) => {
+        const response = await seeded.app.inject({ method: 'GET', url: `/api${url}` });
+        expect(response.statusCode).toBe(200);
+        return response.json() as unknown;
+      };
+      const ids = (await get('/dealerships')) as { items: { id: number }[] };
+      expect(ids.items.length).toBeGreaterThan(1);
+
+      let agingSeen = 0;
+      for (const { id } of ids.items) {
+        const total = async (query: string) =>
+          VehicleListResponseSchema.parse(await get(`/dealerships/${id}/vehicles${query}`)).total;
+        const kpis = InventorySummarySchema.parse(await get(`/dealerships/${id}/summary`));
+
+        expect(kpis.totalVehicles).toBe(await total(''));
+        expect(kpis.agingCount).toBe(await total('?agingOnly=true'));
+        expect(kpis.needsAttentionCount).toBe(await total('?needsAttention=true'));
+        agingSeen += kpis.agingCount;
+      }
+      expect(agingSeen).toBeGreaterThan(0);
+    } finally {
+      await seeded.close();
+    }
   });
 });

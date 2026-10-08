@@ -20,7 +20,7 @@
     "test:api": "npm run test -w server",
     "coverage": "vitest run --coverage",
     "coverage:api": "npm run coverage -w server",
-    "validate": "npm run typecheck && npm run lint && npm run format:check && npm run coverage && npm run coverage:api",
+    "validate": "npm run typecheck && npm run lint && npm run format:check && npm run coverage && npm run coverage:api && npm run test:perf -w server",
     "prepare": "husky",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"

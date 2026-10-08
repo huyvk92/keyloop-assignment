@@ -1,17 +1,28 @@
 import { performance } from 'node:perf_hooks';
-import { FacetsResponseSchema, VehicleListResponseSchema } from '@shared/api/vehicles';
+import {
+  FacetsResponseSchema,
+  InventorySummarySchema,
+  VehicleListResponseSchema,
+} from '@shared/api/vehicles';
 import { insertDealership } from '../../../test/factories';
 import { createTestApp } from '../../../test/helpers';
 import { addDays } from '../../lib/dates';
 
 /**
- * Perf smoke (NFR, TRD §6): 5,000 vehicles in one dealership, in-memory SQLite.
- * Target is < 200 ms per request; the assertion uses 500 ms so a slow CI box doesn't flake.
+ * Perf smoke (NFR, TRD §6 / T-015): 5,000 vehicles in one dealership, in-memory SQLite.
+ * Runs only via `npm run test:perf` (vitest.perf.config.ts): alone, serially, without coverage,
+ * and excluded from the coverage run, where parallel workers and instrumentation made it flaky.
  * Actual timings are attached to the test as annotations.
  */
 const TODAY = '2026-10-07';
 const VEHICLES = 5_000;
-const BUDGET_MS = 500;
+/**
+ * Warm = steady state, held to the T-015 target of 200 ms per request. Cold = first request
+ * after startup (statement preparation, page cache), which pays a one-off cost, so it gets a
+ * looser 750 ms (still inside NFR-02's 1 s user-visible limit).
+ */
+const COLD_BUDGET_MS = 750;
+const WARM_BUDGET_MS = 200;
 const MAKES = [
   ['Ford', ['Fiesta', 'Focus', 'Puma', 'Kuga']],
   ['Toyota', ['Yaris', 'Corolla', 'RAV4']],
@@ -88,8 +99,8 @@ describe(`vehicles list with ${VEHICLES} vehicles (perf smoke)`, () => {
 
     await annotate(`${label}: cold ${cold.ms.toFixed(1)} ms, warm ${warm.ms.toFixed(1)} ms`);
     expect(cold.body.total).toBeGreaterThan(0);
-    expect(cold.ms).toBeLessThan(BUDGET_MS);
-    expect(warm.ms).toBeLessThan(BUDGET_MS);
+    expect(cold.ms).toBeLessThan(COLD_BUDGET_MS);
+    expect(warm.ms).toBeLessThan(WARM_BUDGET_MS);
   });
 
   it('facets stay within budget', async ({ annotate }) => {
@@ -99,7 +110,20 @@ describe(`vehicles list with ${VEHICLES} vehicles (perf smoke)`, () => {
     await annotate(`facets: cold ${cold.ms.toFixed(1)} ms, warm ${warm.ms.toFixed(1)} ms`);
     const facets = FacetsResponseSchema.parse(cold.json);
     expect(facets.makes.map((m) => m.make)).toEqual(['BMW', 'Ford', 'Kia', 'Toyota', 'Volkswagen']);
-    expect(cold.ms).toBeLessThan(BUDGET_MS);
-    expect(warm.ms).toBeLessThan(BUDGET_MS);
+    expect(cold.ms).toBeLessThan(COLD_BUDGET_MS);
+    expect(warm.ms).toBeLessThan(WARM_BUDGET_MS);
+  });
+
+  it('summary stays within budget and matches the list totals', async ({ annotate }) => {
+    const cold = await timedGet('/summary');
+    const warm = await timedGet('/summary');
+
+    await annotate(`summary: cold ${cold.ms.toFixed(1)} ms, warm ${warm.ms.toFixed(1)} ms`);
+    const summary = InventorySummarySchema.parse(cold.json);
+    expect(summary.totalVehicles).toBe(VEHICLES);
+    expect(summary.agingCount).toBe((await timedList('?agingOnly=true')).body.total);
+    expect(summary.needsAttentionCount).toBe((await timedList('?needsAttention=true')).body.total);
+    expect(cold.ms).toBeLessThan(COLD_BUDGET_MS);
+    expect(warm.ms).toBeLessThan(WARM_BUDGET_MS);
   });
 });

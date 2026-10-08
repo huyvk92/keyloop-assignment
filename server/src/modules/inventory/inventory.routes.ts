@@ -2,6 +2,7 @@ import { ApiErrorSchema } from '@shared/api/common';
 import { DealershipParamsSchema } from '@shared/api/dealerships';
 import {
   FacetsResponseSchema,
+  InventorySummarySchema,
   VehicleListQuerySchema,
   VehicleListResponseSchema,
 } from '@shared/api/vehicles';
@@ -47,5 +48,19 @@ export const inventoryRoutes: FastifyPluginAsyncZod<Options> = async (app, { db,
       },
     },
     async (request) => service.getFacets(request.params.dealershipId),
+  );
+  // No querystring schema: list filters never apply to the KPIs, so any query is ignored (BR-15).
+  app.get(
+    '/dealerships/:dealershipId/summary',
+    {
+      schema: {
+        tags: ['inventory'],
+        summary:
+          "KPIs over the dealership's whole stock (list filters ignored): total, aging, % aging, average days in stock, needs attention",
+        params: DealershipParamsSchema,
+        response: { 200: InventorySummarySchema, 400: ApiErrorSchema, 404: ApiErrorSchema },
+      },
+    },
+    async (request) => service.getSummary(request.params.dealershipId),
   );
 };
