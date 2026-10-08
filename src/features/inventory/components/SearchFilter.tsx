@@ -23,6 +23,8 @@ export function SearchFilter({ value, onCommit, className }: Props) {
     <Field
       label={t('inventory.filters.search.label')}
       hint={t('inventory.filters.search.hint')}
+      // Compact under the narrow box in the filter row; still its accessible description.
+      hintClassName="text-xs"
       className={className}
     >
       {(control) => (

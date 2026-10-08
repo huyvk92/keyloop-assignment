@@ -21,6 +21,8 @@ type Props = {
   layout?: 'stacked' | 'inline';
   className?: string;
   labelClassName?: string;
+  /** Extra classes for the hint, e.g. `text-xs` in a compact toolbar; it stays linked. */
+  hintClassName?: string;
   children: (control: FieldControlProps) => ReactNode;
 };
 
@@ -38,6 +40,7 @@ export function Field({
   layout = 'stacked',
   className,
   labelClassName,
+  hintClassName,
   children,
 }: Props) {
   const { hintId, errorId, hasHint, hasError, controlProps } = useFieldIds({ id, hint, error });
@@ -55,7 +58,7 @@ export function Field({
       </label>
       {children(controlProps)}
       {hasHint && (
-        <p id={hintId} className="text-slate-600">
+        <p id={hintId} className={cn('text-slate-600', hintClassName)}>
           {hint}
         </p>
       )}

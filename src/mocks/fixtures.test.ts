@@ -1,6 +1,7 @@
 import { DealershipListResponseSchema } from '@shared/api/dealerships';
 import {
   FacetsResponseSchema,
+  InventorySummarySchema,
   VehicleListQuerySchema,
   VehicleListResponseSchema,
 } from '@shared/api/vehicles';
@@ -10,13 +11,16 @@ import {
   buildCurrentAction,
   buildDealership,
   buildFacets,
+  buildSummary,
   buildVehicle,
   buildVehiclePage,
   buildVehicles,
+  FIXTURE_TODAY,
   fixtureDealerships,
   fixtureVehicles,
 } from '@/mocks/fixtures';
 import { server } from '@/mocks/server';
+import { summarizeVehicles } from '@/mocks/summary-query';
 import { queryVehicles } from '@/mocks/vehicle-query';
 
 describe('fixtures', () => {
@@ -300,6 +304,73 @@ describe('facets', () => {
     } satisfies Partial<HttpError>);
     await expect(fetchJson(facetsUrl('abc'), FacetsResponseSchema)).rejects.toMatchObject({
       status: 400,
+    } satisfies Partial<HttpError>);
+  });
+});
+
+describe('summary (T-022)', () => {
+  const summaryUrl = (id: number | string, search = '') =>
+    apiUrl(`/dealerships/${id}/summary${search}`);
+  const listTotal = async (search: string) =>
+    (await fetchJson(apiUrl(`/dealerships/1/vehicles${search}`), VehicleListResponseSchema)).total;
+
+  it('builds a schema-valid summary (AC-005.1 by default) with overrides', () => {
+    expect(buildSummary()).toEqual({
+      asOfDate: FIXTURE_TODAY,
+      totalVehicles: 8,
+      agingCount: 3,
+      agingPercent: 37.5,
+      averageDaysInStock: 75,
+      needsAttentionCount: 2,
+    });
+    expect(buildSummary({ totalVehicles: 0, averageDaysInStock: null }).averageDaysInStock).toBe(
+      null,
+    );
+    expect(() => buildSummary({ agingPercent: 100.1 })).toThrow();
+  });
+
+  it('serves KPIs that agree with the mock list totals (BR-15, BR-16)', async () => {
+    const body = await fetchJson(summaryUrl(1), InventorySummarySchema);
+
+    expect(body).toEqual(
+      summarizeVehicles(
+        fixtureVehicles.filter((v) => v.dealershipId === 1),
+        FIXTURE_TODAY,
+      ),
+    );
+    expect(body.totalVehicles).toBe(await listTotal(''));
+    expect(body.agingCount).toBe(await listTotal('?agingOnly=true'));
+    expect(body.needsAttentionCount).toBe(await listTotal('?needsAttention=true'));
+    expect(body.agingCount).toBeGreaterThan(0);
+  });
+
+  it('ignores any query string, like the API (AC-005.2)', async () => {
+    const whole = await fetchJson(summaryUrl(1), InventorySummarySchema);
+
+    await expect(
+      fetchJson(summaryUrl(1, '?make=Ford&pageSize=101&make=BMW'), InventorySummarySchema),
+    ).resolves.toEqual(whole);
+  });
+
+  it('serves 0 / 0 / 0 / null for a dealership without stock (AC-005.3)', async () => {
+    await expect(fetchJson(summaryUrl(4), InventorySummarySchema)).resolves.toEqual({
+      asOfDate: FIXTURE_TODAY,
+      totalVehicles: 0,
+      agingCount: 0,
+      agingPercent: 0,
+      averageDaysInStock: null,
+      needsAttentionCount: 0,
+    });
+  });
+
+  it('mirrors the API errors: 404 unknown dealership, 400 invalid id', async () => {
+    await expect(fetchJson(summaryUrl(99), InventorySummarySchema)).rejects.toMatchObject({
+      status: 404,
+      code: 'NOT_FOUND',
+    } satisfies Partial<HttpError>);
+    await expect(fetchJson(summaryUrl('abc'), InventorySummarySchema)).rejects.toMatchObject({
+      status: 400,
+      code: 'VALIDATION_ERROR',
     } satisfies Partial<HttpError>);
   });
 });

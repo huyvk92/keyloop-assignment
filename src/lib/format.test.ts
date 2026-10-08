@@ -4,6 +4,7 @@ import {
   formatInteger,
   formatMileage,
   formatMoney,
+  formatPercent,
 } from '@/lib/format';
 
 describe('formatMoney', () => {
@@ -131,5 +132,22 @@ describe('vi-VN locale (AC-015.4, TA-26)', () => {
     formatMoney(2599000, 'GBP', 'vi-VN');
     expect(formatMoney(2599000, 'GBP')).toBe('£25,990');
     expect(formatMileage(12345)).toBe('12,345 mi');
+  });
+});
+
+describe('formatPercent (BR-15, TA-21)', () => {
+  it('shows up to one decimal place with the sign appended (AC-005.1, AC-005.3)', () => {
+    expect(formatPercent(37.5)).toBe('37.5%');
+    expect(formatPercent(66.7)).toBe('66.7%');
+    expect(formatPercent(0)).toBe('0%');
+    expect(formatPercent(100)).toBe('100%');
+  });
+
+  it('uses the vi-VN decimal comma, like Intl percent formatting', () => {
+    expect(formatPercent(37.5, 'vi-VN')).toBe('37,5%');
+    expect(formatPercent(0, 'vi-VN')).toBe('0%');
+    expect(formatPercent(37.5, 'vi-VN')).toBe(
+      new Intl.NumberFormat('vi-VN', { style: 'percent', maximumFractionDigits: 1 }).format(0.375),
+    );
   });
 });

@@ -4,7 +4,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 import { ErrorFallback } from '@/app/ErrorFallback';
 import { RouteError } from '@/app/RouteError';
 import { i18n } from '@/i18n';
-import { renderRoutes } from '@/test/render';
+import { preloadRouteModules, renderRoutes } from '@/test/render';
 
 describe('ErrorFallback', () => {
   it('shows an alert and recovers when "Try again" is clicked', async () => {
@@ -30,6 +30,8 @@ describe('ErrorFallback', () => {
 });
 
 describe('RouteError', () => {
+  beforeAll(preloadRouteModules);
+
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});

@@ -26,6 +26,19 @@ describe('Field', () => {
     );
   });
 
+  it('keeps a restyled (compact) hint linked to the control', () => {
+    render(
+      <Field label="Search" hint="VIN or model" hintClassName="text-xs">
+        {(control) => <TextInput {...control} />}
+      </Field>,
+    );
+
+    expect(screen.getByRole('textbox', { name: 'Search' })).toHaveAccessibleDescription(
+      'VIN or model',
+    );
+    expect(screen.getByText('VIN or model')).toHaveClass('text-xs');
+  });
+
   it('marks the control invalid and links the visible error text (AC-006.4)', () => {
     render(
       <Field label="Your name" hint="As it should appear in the history" error="Enter your name">

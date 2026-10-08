@@ -53,10 +53,13 @@ describe('AgeRangeFilter', () => {
     expect(router.state.location.search).toBe('?minAge=45&maxAge=90');
     expect(requests.at(-1)?.get('minAge')).toBe('45');
     expect(requests.at(-1)?.get('maxAge')).toBe('90');
-    const days = screen
-      .getAllByRole('row')
-      .slice(1)
-      .map((row) => Number(within(row).getAllByRole('cell')[4]?.textContent));
+    // Days in stock are the table's only 1-3 digit values (years have 4): a cheap text query
+    // instead of reading every cell of every row.
+    const table = screen.getByRole('table', { name: 'Vehicles in stock at Birmingham' });
+    const days = within(table)
+      .getAllByText(/^\d{1,3}$/)
+      .map((cell) => Number(cell.textContent));
+    expect(days).toHaveLength(7);
     expect(days.every((d) => d >= 45 && d <= 90)).toBe(true);
   });
 
@@ -118,12 +121,24 @@ describe('AgeRangeFilter', () => {
     expect(screen.queryByText(/less than or equal to maximum age/)).not.toBeInTheDocument();
     expect(router.state.location.search).toBe('');
     expect(requests).toHaveLength(before);
+  });
+
+  it('applies the range once the 100/50 error is corrected (AC-002.4)', async () => {
+    const requests = recordListRequests();
+    const { user, router } = renderDashboard();
+    await user.type(minInput(), '100');
+    await user.type(maxInput(), '50');
+    await user.click(apply());
+    expect(maxInput()).toHaveAttribute('aria-invalid', 'true');
 
     await user.clear(maxInput());
     await user.type(maxInput(), '150');
     await user.click(apply());
-    expect(await screen.findByText('8 vehicles match your filters')).toBeVisible();
+
+    expect(router.state.location.search).toBe('?minAge=100&maxAge=150');
     expect(maxInput()).not.toHaveAttribute('aria-invalid');
+    // The corrected range is requested; the filtered result itself is covered by the 45-90 test.
+    await waitFor(() => expect(requests.at(-1)?.toString()).toMatch(/minAge=100&maxAge=150/));
   });
 
   it('rejects a value that is not a whole number of days', async () => {

@@ -1,9 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import { App } from '@/app/App';
 import { routes } from '@/app/router';
-import { renderRoutes } from '@/test/render';
+import { preloadRouteModules, renderRoutes } from '@/test/render';
 
 describe('App', () => {
+  beforeAll(preloadRouteModules);
+
   it('boots with providers and opens the first dealership dashboard', async () => {
     render(<App />);
 

@@ -7,6 +7,7 @@ import { apiUrl } from '@/lib/http';
 import { buildVehicle, buildVehiclePage } from '@/mocks/fixtures';
 import { server } from '@/mocks/server';
 import { recordAnnouncements } from '@/test/announcements';
+import { startManualClock, stopManualClock } from '@/test/manual-clock';
 import { renderWithProviders } from '@/test/render';
 
 const vehiclesPattern = apiUrl('/dealerships/:dealershipId/vehicles');
@@ -134,20 +135,7 @@ describe('FilterBar', () => {
   });
 
   describe('search (fake timers)', () => {
-    /**
-     * Fake timers without `shouldAdvanceTime`, so the clock only moves when the test says so.
-     * Testing Library drains its async wrapper with a `setTimeout(0)` and advances it only when
-     * it detects Jest fake timers; this shim lets it advance Vitest's clock by 0 ms the same way.
-     */
-    function useManualClock() {
-      vi.useFakeTimers();
-      vi.stubGlobal('jest', { advanceTimersByTime: (ms: number) => vi.advanceTimersByTime(ms) });
-    }
-
-    afterEach(() => {
-      vi.useRealTimers();
-      vi.unstubAllGlobals();
-    });
+    afterEach(stopManualClock);
 
     it('sends one debounced, trimmed request 300 ms after typing " stk-102 " (AC-002.6, TA-08)', async () => {
       const requests = recordListRequests();
@@ -155,7 +143,7 @@ describe('FilterBar', () => {
       await screen.findByText('30 vehicles in stock');
       // From here the only clock movement before the commit is the explicit 299 + 1 ms below;
       // `delay: null` makes user-event itself use no timers.
-      useManualClock();
+      startManualClock();
       const user = userEvent.setup({ delay: null });
       const searchbox = screen.getByRole('searchbox', { name: 'Search' });
 

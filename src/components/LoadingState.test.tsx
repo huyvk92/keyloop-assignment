@@ -17,6 +17,13 @@ describe('LoadingState', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Loading vehicles…');
   });
 
+  it('adds no status region when announce is false, keeping the label for screen readers', () => {
+    render(<LoadingState announce={false} label="Loading aging stock…" />);
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByText('Loading aging stock…')).toBeInTheDocument();
+  });
+
   it('announces the default label in Vietnamese', async () => {
     await i18n.changeLanguage('vi');
     render(<LoadingState />);

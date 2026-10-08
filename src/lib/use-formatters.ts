@@ -7,6 +7,7 @@ import {
   formatInteger,
   formatMileage,
   formatMoney,
+  formatPercent,
   type Locale,
 } from '@/lib/format';
 
@@ -17,6 +18,8 @@ export type Formatters = {
   dateTime: (isoInstant: string, timeZone: string) => string;
   integer: (value: number) => string;
   mileage: (miles: number) => string;
+  /** A 0-100 value with up to 1 dp: "37.5%" / "37,5%". */
+  percent: (value: number) => string;
 };
 
 /**
@@ -34,6 +37,7 @@ export function useFormatters(): Formatters {
       dateTime: (isoInstant, timeZone) => formatDateTime(isoInstant, timeZone, locale),
       integer: (value) => formatInteger(value, locale),
       mileage: (miles) => formatMileage(miles, locale),
+      percent: (value) => formatPercent(value, locale),
     }),
     [locale],
   );

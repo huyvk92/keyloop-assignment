@@ -61,25 +61,34 @@ export function AgeRangeFilter({ minAge, maxAge, onApply, className }: Props) {
         })(event)
       }
     >
-      <fieldset className="flex flex-wrap items-start gap-3">
-        <legend className="mb-1 text-sm font-medium text-slate-700">
+      {/* One compact row: legend, inline labels and Apply side by side (AC-005.4). A floated
+          legend takes part in the flex layout like any other child (HTML rendering of
+          fieldset); it still names the group. Errors wrap below their input. */}
+      <fieldset className="flex flex-wrap items-start gap-x-3 gap-y-2">
+        <legend className="float-left flex h-10 items-center text-sm font-medium text-slate-700">
           {t('inventory.filters.ageRange.legend')}
         </legend>
         <Field
+          layout="inline"
           label={t('inventory.filters.ageRange.min')}
           error={errorText(errors.minAge)}
-          className="w-40"
+          className="max-w-64"
         >
-          {(control) => <TextInput {...control} inputMode="numeric" {...register('minAge')} />}
+          {(control) => (
+            <TextInput {...control} inputMode="numeric" className="w-20" {...register('minAge')} />
+          )}
         </Field>
         <Field
+          layout="inline"
           label={t('inventory.filters.ageRange.max')}
           error={errorText(errors.maxAge)}
-          className="w-40"
+          className="max-w-64"
         >
-          {(control) => <TextInput {...control} inputMode="numeric" {...register('maxAge')} />}
+          {(control) => (
+            <TextInput {...control} inputMode="numeric" className="w-20" {...register('maxAge')} />
+          )}
         </Field>
-        <Button type="submit" variant="secondary" className="mt-6">
+        <Button type="submit" variant="secondary">
           {t('inventory.filters.ageRange.apply')}
         </Button>
       </fieldset>

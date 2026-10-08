@@ -14,6 +14,7 @@ describe('useFormatters', () => {
     );
     expect(result.current.mileage(12345)).toBe('12,345 mi');
     expect(result.current.integer(1200)).toBe('1,200');
+    expect(result.current.percent(37.5)).toBe('37.5%');
 
     await act(() => i18n.changeLanguage('vi'));
 
@@ -25,5 +26,6 @@ describe('useFormatters', () => {
     );
     expect(result.current.mileage(12345)).toBe('12.345 mi');
     expect(result.current.integer(1200)).toBe('1.200');
+    expect(result.current.percent(37.5)).toBe('37,5%');
   });
 });

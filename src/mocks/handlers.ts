@@ -5,10 +5,13 @@ import { http, HttpResponse, type RequestHandler } from 'msw';
 import { apiUrl } from '@/lib/http';
 import {
   buildFacets,
+  buildSummary,
   buildVehiclePage,
+  FIXTURE_TODAY,
   fixtureDealerships,
   fixtureVehicles,
 } from '@/mocks/fixtures';
+import { summarizeVehicles } from '@/mocks/summary-query';
 import { queryVehicles } from '@/mocks/vehicle-query';
 
 /**
@@ -67,5 +70,19 @@ export const handlers: RequestHandler[] = [
     }
     const stock = fixtureVehicles.filter((v) => v.dealershipId === dealershipId);
     return HttpResponse.json(buildFacets(stock) satisfies FacetsResponse);
+  }),
+
+  // Whole stock; like the API, any query string is ignored (BR-15, AC-005.2).
+  http.get(apiUrl('/dealerships/:dealershipId/summary'), ({ params }) => {
+    const parsedParams = DealershipParamsSchema.safeParse(params);
+    if (!parsedParams.success) {
+      return apiError(400, 'VALIDATION_ERROR', 'Request validation failed');
+    }
+    const { dealershipId } = parsedParams.data;
+    if (!isKnownDealership(dealershipId)) {
+      return apiError(404, 'NOT_FOUND', `Dealership ${dealershipId} not found`);
+    }
+    const stock = fixtureVehicles.filter((v) => v.dealershipId === dealershipId);
+    return HttpResponse.json(buildSummary(summarizeVehicles(stock, FIXTURE_TODAY)));
   }),
 ];

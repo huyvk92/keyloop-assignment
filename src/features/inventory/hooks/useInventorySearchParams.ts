@@ -99,6 +99,17 @@ export function useInventorySearchParams(dealershipId: number) {
     [query, write],
   );
 
+  /**
+   * Replaces every filter with exactly `filters` (TA-29): sort and page return to their
+   * defaults, the page size stays, and a history entry is pushed. Like Clear filters, unapplied
+   * drafts (search, age range) are dropped, so a pending search can't re-add itself afterwards.
+   */
+  const replaceFilters = useCallback(
+    (filters: VehicleFilters) =>
+      write({ ...filters, pageSize: query.pageSize }, { state: FILTERS_CLEARED_STATE }),
+    [query.pageSize, write],
+  );
+
   /** `?search` for another page with the same filters (for `<Navigate>`). */
   const searchFor = (page: number) => toSearch({ ...query, page });
 
@@ -107,6 +118,7 @@ export function useInventorySearchParams(dealershipId: number) {
     hasFilters: hasActiveFilters(query),
     setFilter,
     setFilters,
+    replaceFilters,
     setSearch,
     setSort,
     setPage,

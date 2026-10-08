@@ -129,6 +129,12 @@ export function hasActiveFilters(query: VehicleListQuery): boolean {
 export const FILTER_REGION_ID = 'inventory-filters';
 
 /**
+ * DOM id of the vehicle list region (one per page). "View all aging vehicles" moves focus here so
+ * keyboard and screen reader users land on the results it filtered (TA-11).
+ */
+export const LIST_REGION_ID = 'inventory-list';
+
+/**
  * Router location state of the navigation made by "Clear filters" (AC-002.8). Clearing can leave
  * the URL's range and search unchanged (e.g. from `?q=zzz` the range was never applied), so the
  * filter bar can't tell from the URL alone that unapplied drafts must be dropped; this marker

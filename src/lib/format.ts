@@ -3,6 +3,7 @@
  * - en-GB: "£25,990", "07 Oct 2026", "07 Oct 2026, 14:32", "12,345 mi" (fixed month table).
  * - vi-VN: "25.990 £", "07/10/2026", "07/10/2026 14:32", "12.345 mi" (Intl vi-VN separators;
  *   the currency stays the dealership's, the mileage unit stays "mi").
+ * - Percentages: "37.5%" (en-GB), "37,5%" (vi-VN); see `formatPercent`.
  * Date-only values are formatted in UTC so they never shift a day in the runner's time zone.
  */
 export type Locale = 'en-GB' | 'vi-VN';
@@ -166,4 +167,21 @@ export function formatInteger(value: number, locale: Locale = 'en-GB'): string {
 /** Format a mileage in miles as "12,345 mi" (TA-04); vi-VN: "12.345 mi". */
 export function formatMileage(miles: number, locale: Locale = 'en-GB'): string {
   return `${formatInteger(miles, locale)} mi`;
+}
+
+const percentFormatters = new Map<Locale, Intl.NumberFormat>();
+
+/**
+ * Format a percentage that is already 0-100 with up to one decimal place (BR-15, TA-21):
+ * "37.5%", "0%", "100%" (en-GB); "37,5%" (vi-VN). The number uses the locale's decimal
+ * separator and the sign is appended without a space, which is what Intl's percent style gives
+ * for both locales; formatting the 0-100 value directly avoids dividing by 100 in floating point.
+ */
+export function formatPercent(value: number, locale: Locale = 'en-GB'): string {
+  let formatter = percentFormatters.get(locale);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
+    percentFormatters.set(locale, formatter);
+  }
+  return `${formatter.format(value)}%`;
 }

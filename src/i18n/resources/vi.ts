@@ -70,7 +70,33 @@ export const vi = {
   },
   inventory: {
     agingBadge: 'Tồn kho lâu',
+    kpis: {
+      title: 'Tổng quan tồn kho',
+      loadError: 'Không thể tải tổng quan tồn kho',
+      total: 'Tổng số xe',
+      aging: 'Tồn kho lâu',
+      agingPercent: '% tồn kho lâu',
+      averageDays: 'Số ngày tồn kho trung bình',
+      noValue: 'Không có dữ liệu',
+      refreshFailed: 'Không thể làm mới tổng quan tồn kho. Đang hiển thị số liệu tải gần nhất.',
+    },
+    aging: {
+      title: 'Xe tồn kho lâu',
+      listLabel: 'Xe tồn kho lâu, cũ nhất trước',
+      loading: 'Đang tải xe tồn kho lâu…',
+      loadError: 'Không thể tải xe tồn kho lâu',
+      empty: {
+        title: 'Không có xe tồn kho lâu',
+        description: 'Không có xe nào tồn kho quá 90 ngày.',
+      },
+      viewAll_one: 'Xem {{total}} xe tồn kho lâu',
+      viewAll_other: 'Xem tất cả {{total}} xe tồn kho lâu',
+      days_one: '{{days}} ngày',
+      days_other: '{{days}} ngày',
+      refreshFailed: 'Không thể làm mới xe tồn kho lâu. Đang hiển thị dữ liệu tải gần nhất.',
+    },
     list: {
+      label: 'Danh sách xe',
       loading: 'Đang tải danh sách xe…',
       loadError: 'Không thể tải danh sách xe',
       updating: 'Đang cập nhật…',

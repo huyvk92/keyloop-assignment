@@ -70,7 +70,42 @@ export const en = {
   },
   inventory: {
     agingBadge: 'Aging',
+    /** KPI cards (US-005): whole-stock summary of the dealership, never the filtered list. */
+    kpis: {
+      /** Accessible name of the KPI region (visually hidden heading). */
+      title: 'Inventory summary',
+      loadError: "Couldn't load the inventory summary",
+      total: 'Total vehicles',
+      aging: 'Aging',
+      agingPercent: '% aging',
+      averageDays: 'Average days in stock',
+      /** Read instead of the visual "-" when there is no average (no vehicles, BR-15). */
+      noValue: 'Not available',
+      /** Quiet hint (not a live region) when a background refresh fails; last values stay. */
+      refreshFailed: "Couldn't refresh the summary. Showing the last loaded figures.",
+    },
+    /** Aging section (US-004, TA-11): the 10 oldest vehicles over 90 days. */
+    aging: {
+      title: 'Aging stock',
+      listLabel: 'Aging vehicles, oldest first',
+      loading: 'Loading aging stock…',
+      loadError: "Couldn't load aging stock",
+      empty: {
+        title: 'No aging stock',
+        description: 'No vehicle has been in stock for more than 90 days.',
+      },
+      /** `total` is the formatted count of all aging vehicles, not only the 10 shown. */
+      viewAll_one: 'View {{total}} aging vehicle',
+      viewAll_other: 'View all {{total}} aging vehicles',
+      /** `days` is the formatted day count. */
+      days_one: '{{days}} day',
+      days_other: '{{days}} days',
+      /** Quiet hint (not a live region) when a background refresh fails; last vehicles stay. */
+      refreshFailed: "Couldn't refresh aging stock. Showing the last loaded vehicles.",
+    },
     list: {
+      /** Accessible name of the list region; focus target of "View all aging vehicles". */
+      label: 'Vehicle list',
       loading: 'Loading vehicles…',
       loadError: "Couldn't load vehicles",
       updating: 'Updating…',

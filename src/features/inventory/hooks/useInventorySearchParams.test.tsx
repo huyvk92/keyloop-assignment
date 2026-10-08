@@ -150,6 +150,20 @@ describe('useInventorySearchParams', () => {
     expect(isFiltersClearedState(result.current.location.state)).toBe(true);
   });
 
+  it('replaceFilters keeps only the given filters, resets sort and page, keeps the page size (TA-29)', () => {
+    const result = setup(
+      '/dealerships/1?make=Ford&model=Focus&q=stk&minAge=10&sort=price&order=desc&page=2&pageSize=50',
+    );
+
+    act(() => result.current.replaceFilters({ agingOnly: true }));
+
+    expect(result.current.location.pathname).toBe('/dealerships/1');
+    expect(result.current.location.search).toBe('?agingOnly=true&pageSize=50');
+    expect(result.current.navigationType).toBe('PUSH');
+    // Drafts (search, age range) are dropped like on Clear filters.
+    expect(isFiltersClearedState(result.current.location.state)).toBe(true);
+  });
+
   it('sets the sort (back to page 1) and the page, leaving defaults out of the URL', () => {
     const result = setup('/dealerships/1?make=Ford&page=3');
 

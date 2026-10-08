@@ -4,9 +4,11 @@ import { routes } from '@/app/router';
 import { apiUrl } from '@/lib/http';
 import { fixtureDealerships } from '@/mocks/fixtures';
 import { server } from '@/mocks/server';
-import { renderRoutes } from '@/test/render';
+import { preloadRouteModules, renderRoutes } from '@/test/render';
 
 describe('IndexRedirectPage', () => {
+  beforeAll(preloadRouteModules);
+
   it('redirects "/" to the alphabetically first dealership (AC-008.1)', async () => {
     const { router } = renderRoutes(routes, { route: '/' });
 

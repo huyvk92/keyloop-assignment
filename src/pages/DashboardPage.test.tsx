@@ -1,12 +1,18 @@
-import { act, screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import { delay, http, HttpResponse } from 'msw';
 import { routes } from '@/app/router';
 import { createI18n, i18n, LANGUAGE_STORAGE_KEY } from '@/i18n';
 import { apiUrl } from '@/lib/http';
 import { server } from '@/mocks/server';
-import { renderRoutes } from '@/test/render';
+import { preloadRouteModules, renderRoutes } from '@/test/render';
+
+const AGING_SEARCH = '?agingOnly=true&sort=age&order=desc&pageSize=10';
+/** The aging section's request (TA-11), as opposed to the main list's. */
+const isAgingRequest = (url: URL) => url.search === AGING_SEARCH;
 
 describe('DashboardPage', () => {
+  beforeAll(preloadRouteModules);
+
   it('renders the selected dealership from the URL as the h1 and document title (AC-008.3)', async () => {
     renderRoutes(routes, { route: '/dealerships/2' });
 
@@ -56,7 +62,8 @@ describe('DashboardPage', () => {
     const listRequests: URLSearchParams[] = [];
     server.use(
       http.get(apiUrl('/dealerships/:dealershipId/vehicles'), ({ request }) => {
-        listRequests.push(new URL(request.url).searchParams);
+        const url = new URL(request.url);
+        if (!isAgingRequest(url)) listRequests.push(url.searchParams);
       }),
     );
     const { router } = renderRoutes(routes, { route: '/dealerships/1?sort=price&order=desc' });
@@ -65,12 +72,11 @@ describe('DashboardPage', () => {
     expect(router.state.location.search).toBe('?sort=price&order=desc');
     expect(listRequests.at(-1)?.get('sort')).toBe('price');
     expect(listRequests.at(-1)?.get('order')).toBe('desc');
+    // Only the price cells (GBP for Birmingham), via a cheap text query instead of reading all
+    // 25 x 13 cells by role.
     const prices = within(table)
-      .getAllByRole('row')
-      .slice(1)
-      .map((row) =>
-        Number(within(row).getAllByRole('cell')[7]?.textContent?.replace(/[^\d]/g, '')),
-      );
+      .getAllByText(/^£[\d,.]+$/)
+      .map((cell) => Number(cell.textContent?.replace(/[^\d]/g, '')));
     expect(prices).toHaveLength(25);
     expect(prices).toEqual([...prices].sort((a, b) => b - a));
     expect(new Set(prices).size).toBeGreaterThan(1);
@@ -116,6 +122,90 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('link', { name: 'Đến bảng điều khiển' })).toHaveAttribute('href', '/');
   });
 
+  describe('aging section (US-004)', () => {
+    it('shows the KPIs, then the aging stock, then the filters and the list, without any filter (AC-004.1, AC-005.4)', async () => {
+      renderRoutes(routes, { route: '/dealerships/1?make=Toyota' });
+
+      const aging = await screen.findByRole('region', { name: 'Aging stock' });
+      const list = await within(aging).findByRole('list', { name: 'Aging vehicles, oldest first' });
+      // Oldest first and unaffected by the list's make filter: the 10 oldest of 19.
+      const items = within(list).getAllByRole('listitem');
+      expect(items).toHaveLength(10);
+      expect(items[0]).toHaveTextContent('STK-1001');
+      expect(items[0]).toHaveTextContent('200 days');
+      expect(items[9]).toHaveTextContent('STK-1010');
+      expect(
+        within(aging).getByRole('button', { name: 'View all 19 aging vehicles' }),
+      ).toBeVisible();
+      // Page order: KPIs, aging section, filters, then the list (AC-005.4 layout).
+      const kpis = screen.getByRole('region', { name: 'Inventory summary' });
+      const filters = screen.getByRole('search', { name: 'Filter vehicles' });
+      const vehicleList = screen.getByRole('region', { name: 'Vehicle list' });
+      expect(kpis.compareDocumentPosition(aging)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+      expect(aging.compareDocumentPosition(filters)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+      expect(filters.compareDocumentPosition(vehicleList)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+
+    it('"View all" replaces the filters with Aging only, shows exactly N and focuses the results (TA-29, AC-004.3)', async () => {
+      const { user, router } = renderRoutes(routes, {
+        route: '/dealerships/1?make=Ford&q=stk&minAge=10&sort=price',
+      });
+      expect(await screen.findByText('6 vehicles match your filters')).toBeVisible();
+
+      await user.click(await screen.findByRole('button', { name: 'View all 19 aging vehicles' }));
+
+      // Other filters and the sort are cleared, so the list holds the 19 the button promised.
+      expect(router.state.location.search).toBe('?agingOnly=true');
+      expect(router.state.historyAction).toBe('PUSH');
+      expect(screen.getByRole('region', { name: 'Vehicle list' })).toHaveFocus();
+      expect(await screen.findByText('19 vehicles match your filters')).toBeVisible();
+      expect(screen.getByText('Showing 1-19 of 19')).toBeVisible();
+      expect(screen.getByRole('checkbox', { name: 'Aging only (over 90 days)' })).toBeChecked();
+      expect(screen.getByRole('combobox', { name: 'Make' })).toHaveDisplayValue('All makes');
+      expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('');
+      expect(screen.getByRole('textbox', { name: 'Minimum days' })).toHaveValue('');
+    });
+
+    it('sends the same summary and aging requests in Vietnamese as in English (BR-19)', async () => {
+      const requestsIn = async (language: 'en' | 'vi', viewAllLabel: string) => {
+        await i18n.changeLanguage(language);
+        const sent: string[] = [];
+        server.use(
+          http.get(apiUrl('/dealerships/:dealershipId/vehicles'), ({ request }) => {
+            const url = new URL(request.url);
+            if (isAgingRequest(url)) sent.push(url.href);
+          }),
+          http.get(apiUrl('/dealerships/:dealershipId/summary'), ({ request }) => {
+            sent.push(request.url);
+          }),
+        );
+        const { unmount } = renderRoutes(routes, { route: '/dealerships/1' });
+        expect(await screen.findByRole('button', { name: viewAllLabel })).toBeVisible();
+        await waitFor(() => expect(sent).toHaveLength(2));
+        unmount();
+        server.resetHandlers();
+        return sent.sort();
+      };
+
+      const english = await requestsIn('en', 'View all 19 aging vehicles');
+      const vietnamese = await requestsIn('vi', 'Xem tất cả 19 xe tồn kho lâu');
+
+      // One summary and one aging request each; no language or locale in the params.
+      expect(english).toEqual([
+        apiUrl('/dealerships/1/summary'),
+        `${apiUrl('/dealerships/1/vehicles')}${AGING_SEARCH}`,
+      ]);
+      expect(vietnamese).toEqual(english);
+    });
+
+    it('shows "No aging stock" for a dealership without aging vehicles (AC-004.2)', async () => {
+      renderRoutes(routes, { route: '/dealerships/3' });
+
+      const aging = await screen.findByRole('region', { name: 'Aging stock' });
+      expect(await within(aging).findByText('No aging stock')).toBeVisible();
+    });
+  });
+
   describe('dealership selector (US-008)', () => {
     it('shows the dealership from the URL as selected, so reload and share keep it (AC-008.3)', async () => {
       renderRoutes(routes, { route: '/dealerships/2' });
@@ -126,16 +216,24 @@ describe('DashboardPage', () => {
 
     it('switches dealership: new path, filters reset, only the new rows, focus kept (AC-008.2, BR-04, TA-10)', async () => {
       const listRequests: URL[] = [];
+      const agingRequests: URL[] = [];
+      const summaryRequests: URL[] = [];
       server.use(
         http.get(apiUrl('/dealerships/:dealershipId/vehicles'), ({ request }) => {
-          listRequests.push(new URL(request.url));
+          const url = new URL(request.url);
+          (isAgingRequest(url) ? agingRequests : listRequests).push(url);
           // Fall through to the default handler.
+        }),
+        http.get(apiUrl('/dealerships/:dealershipId/summary'), ({ request }) => {
+          summaryRequests.push(new URL(request.url));
         }),
       );
       const { user, router } = renderRoutes(routes, { route: '/dealerships/1?page=2' });
       expect(await screen.findByText('Showing 26-30 of 30')).toBeVisible();
       expect(screen.getByRole('row', { name: /STK-1026/ })).toBeVisible();
       listRequests.length = 0;
+      agingRequests.length = 0;
+      summaryRequests.length = 0;
 
       const select = screen.getByRole('combobox', { name: 'Dealership' });
       await user.selectOptions(select, 'Leeds');
@@ -152,6 +250,19 @@ describe('DashboardPage', () => {
         apiUrl('/dealerships/2/vehicles'),
       ]);
       expect(listRequests[0]?.searchParams.get('page')).toBe('1');
+      // The aging section follows the dealership too, and shows only Leeds stock (TA-11).
+      expect(agingRequests.map((url) => `${url.origin}${url.pathname}`)).toEqual([
+        apiUrl('/dealerships/2/vehicles'),
+      ]);
+      expect(
+        await screen.findByRole('button', { name: 'View all 4 aging vehicles' }),
+      ).toBeVisible();
+      // So do the KPIs (AC-008.2).
+      expect(summaryRequests.map((url) => url.href)).toEqual([apiUrl('/dealerships/2/summary')]);
+      const kpis = screen.getByRole('region', { name: 'Inventory summary' });
+      expect(within(kpis).getByRole('definition', { name: 'Total vehicles' })).toHaveTextContent(
+        '4',
+      );
       expect(document.title).toBe('Leeds · Inventory dashboard');
       // A keyboard user changing the select keeps their place (no jump to the h1).
       expect(screen.getByRole('combobox', { name: 'Dealership' })).toHaveFocus();

@@ -3,10 +3,12 @@ import { DealershipSchema, type Dealership } from '@shared/api/dealerships';
 import {
   AGING_THRESHOLD_DAYS,
   FacetsResponseSchema,
+  InventorySummarySchema,
   PAGE_SIZE_DEFAULT,
   VehicleListItemSchema,
   VehicleListResponseSchema,
   type FacetsResponse,
+  type InventorySummary,
   type VehicleListItem,
   type VehicleListResponse,
 } from '@shared/api/vehicles';
@@ -144,6 +146,22 @@ export function buildFacets(vehicles: VehicleListItem[]): FacetsResponse {
       make,
       models: [...(models.get(make) ?? [])].sort(byText),
     })),
+  });
+}
+
+/**
+ * A KPI summary, by default the AC-005.1 example (8 / 3 / 37.5 % / 75 days). Handlers compute
+ * the real values from the fixtures with `summarizeVehicles` (src/mocks/summary-query.ts).
+ */
+export function buildSummary(overrides: Partial<InventorySummary> = {}): InventorySummary {
+  return InventorySummarySchema.parse({
+    asOfDate: FIXTURE_TODAY,
+    totalVehicles: 8,
+    agingCount: 3,
+    agingPercent: 37.5,
+    averageDaysInStock: 75,
+    needsAttentionCount: 2,
+    ...overrides,
   });
 }
 

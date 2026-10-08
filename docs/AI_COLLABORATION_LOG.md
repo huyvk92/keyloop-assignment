@@ -325,3 +325,59 @@ Scaffold (`/init-react-app`) -> TDD implementation (`/implement-trd`) -> Review 
   when the same query's text changes. That relies on common screen-reader behaviour, and
   VoiceOver may differ. Paging is no longer announced. Both are queued for T-038 with a real
   screen-reader check rather than taken as done.
+
+### 2026-10-07 · implement-trd phase 3 (KPIs and aging section: T-021..T-024)
+
+- **Waves**:
+  - Wave 1 ran in parallel: the backend built the summary contract and endpoint, plus MSW
+    support and summary parity scenarios; the web built the aging section, which only needs the
+    existing list endpoint.
+  - Wave 2 (web): KPI cards and the layout for AC-005.4.
+- **My decisions during the phase**:
+  - TA-29: "View all N aging vehicles" originally kept the other filters, so with Ford active the
+    button said 19 but the list showed 3. I decided it replaces the filters with only
+    `agingOnly=true`. The filter-bar checkbox still combines with other filters (AC-004.3).
+  - Perf: the cold request flaked at 595 ms under parallel load. A first workaround (cold 1 s /
+    warm 500 ms) was rejected by the reviewer as using up the whole NFR-02 budget. Final
+    decision: run the perf file on its own, with cold < 750 ms and warm < 200 ms.
+  - Test timing: 3 s `findBy` waits flaked as the suite grew to 438 tests. I briefly raised the
+    limit to 5 s; the reviewer called it masking, and the tester measured 4-7x slowdowns under
+    coverage plus contention. The fix round goes after the causes: capped workers, splitting a
+    two-behaviour test, cheaper table queries, and route preloads built from the router. Then
+    the limit goes back down.
+- **My own mistakes caught in this phase**:
+  - A `validate` run that I read as "no output" had actually stopped at the format check,
+    because of my unformatted TRD table edit.
+  - My TRD note claimed the age-clamp mutation was caught "on both sides". The tester showed the
+    web-side row was tautological, so I corrected the note.
+- **Verification (mine, real API, headless Chrome at 1280x800)**:
+  - KPIs show 360 / 86 / 23.9% / 86 and match `/summary`; the bottom of the KPI cards is at
+    y=239 (AC-005.4).
+  - The aging section shows the 10 oldest; the filter bar is 2 rows.
+  - York shows 0 / 0 / 0% / "-" and "No aging stock".
+  - axe reports 0 violations.
+- **End-of-phase review**: CHANGES REQUESTED. Both the code reviewer and the test engineer,
+  working independently, found the same BR-15 bug: `Math.round(a / n * 1000) / 10` gives 50.2
+  for 201/400 instead of 50.3. I confirmed it, and checked that the fix (multiply first) has 0
+  mismatches against exact half-up rounding for every pair up to n = 10,000. The parity table
+  could not catch it because both sides copied the TRD's formula, so the TRD (TA-21) was the
+  root cause and was fixed there too.
+- **Fix round**: two agents on disjoint files.
+  - Backend: rounding on both sides, more parity rows (including .x5 and float-trap cases), a
+    `serverOnly` flag for rows only the server can verify, and the isolated perf run.
+  - Web: flakiness root causes, quiet stale hints for KPIs and aging, a non-live aging loading
+    state, a single screen-reader loading text, and the test gaps.
+- **Fix-round outcome (verified by me)**:
+  - The web agent was interrupted by a session limit mid-task. I checked the working tree was
+    consistent (typecheck and lint clean), then resumed the same agent with its context and told
+    it to re-check which items were already done before continuing.
+  - Backend mutation matrix: the server catches all 8 mutations; the web mock catches 6. The 2
+    that need date logic or action history are flagged `serverOnly` instead of being claimed.
+  - I mutation-checked the new TA-29 draft test myself (the agent had not). Removing the clear
+    marker from `replaceFilters` makes it fail. Restored byte-identical.
+  - `asyncUtilTimeout` is back at 3 s after the root-cause fixes (capped workers, split test,
+    cheaper queries, router-derived preloads).
+  - `npm run validate` passed twice: web 448 (+2 server-only rows skipped by design), API 258,
+    isolated perf 7 (worst cold 74 ms against a 750 ms budget).
+  - AC-005.4 screenshots committed to `docs/screenshots/` (EN and VI, real API, KPI bottom at
+    y=239 of 800).

@@ -5,7 +5,13 @@ import { ErrorState } from '@/components/ErrorState';
 import { LoadingState } from '@/components/LoadingState';
 import { PageSection } from '@/components/PageSection';
 import { DealershipSelector, useDealership } from '@/features/dealerships';
-import { FilterBar, useCanonicalSearch, VehicleTable } from '@/features/inventory';
+import {
+  AgingSection,
+  FilterBar,
+  KpiCards,
+  useCanonicalSearch,
+  VehicleTable,
+} from '@/features/inventory';
 import { shouldKeepFocus } from '@/lib/navigation-focus';
 
 /** `/dealerships/:dealershipId`: the dealership comes from the path (ADR-008, AC-008.3). */
@@ -56,6 +62,11 @@ export function DashboardPage() {
       focusHeadingOnChange={!keepFocus}
       actions={<DealershipSelector dealershipId={dealership.id} />}
     >
+      {/* Page order: KPIs → aging section → filters + list, so the summary is visible without
+          scrolling at 1280x800 and the aging stock follows (AC-005.4, AC-004.1).
+          No onSelectVehicle until the dialog exists (T-030). */}
+      <KpiCards dealershipId={dealership.id} />
+      <AgingSection dealershipId={dealership.id} />
       {/* Keyed by dealership: a switch drops the search draft and any pending debounce (TA-10). */}
       <FilterBar key={dealership.id} dealershipId={dealership.id} />
       <VehicleTable dealership={dealership} />

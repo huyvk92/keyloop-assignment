@@ -23,6 +23,10 @@ export default defineConfig({
     // Multi-step async UI tests (placeholder data, refetch, navigation) exceeded the 5 s default
     // under CPU contention (parallel agents, CI runners). Assertions still use findBy* waits.
     testTimeout: 15_000,
+    // Half the cores (4 of 8 here): measured the same or faster than the default (cores - 1)
+    // for the coverage run (84-87 s vs 94-96 s on a loaded machine), with less CPU contention
+    // per jsdom worker, which is what made the async UI tests time out.
+    maxWorkers: '50%',
     css: true,
     include: ['src/**/*.test.{ts,tsx}', 'shared/**/*.test.ts'],
     coverage: {
