@@ -166,12 +166,19 @@ export function createInventoryRepository(db: Db) {
      ORDER BY make COLLATE NOCASE, make, model COLLATE NOCASE, model`,
   );
 
+  const findByIdStatement = db.prepare<[number], VehicleRow>(`${SELECT_LIST} WHERE v.id = ?`);
+
   const summaryStatement = db.prepare<
     [{ dealershipId: number; today: string; stockInTo: string }],
     SummaryTotals
   >(SUMMARY_SQL);
 
   return {
+    /** One vehicle (any dealership; ids are global, TA-19) with its latest action (BR-14). */
+    findById(vehicleId: number): VehicleRow | undefined {
+      return findByIdStatement.get(vehicleId);
+    },
+
     /** KPI aggregates over the dealership's whole stock; no list filters apply (BR-15). */
     summaryTotals({ dealershipId, today, agingCutoff }: SummaryQuery): SummaryTotals {
       // COUNT/SUM without GROUP BY always yields exactly one row.

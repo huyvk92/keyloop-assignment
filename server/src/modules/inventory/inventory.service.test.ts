@@ -3,6 +3,7 @@ import { migrate } from '../../db/migrate';
 import { fixedClock, type Clock } from '../../lib/clock';
 import { NotFoundError } from '../../lib/errors';
 import { insertAction, insertDealership, insertVehicle } from '../../../test/factories';
+import { createActionsRepository } from '../actions/actions.repository';
 import { createDealershipsRepository } from '../dealerships/dealerships.repository';
 import { createInventoryRepository } from './inventory.repository';
 import { createInventoryService } from './inventory.service';
@@ -21,6 +22,7 @@ function service(clock: Clock = fixedClock('2026-10-07')) {
   return createInventoryService({
     dealerships: createDealershipsRepository(db),
     inventory: createInventoryRepository(db),
+    actions: createActionsRepository(db),
     clock,
   });
 }
@@ -391,5 +393,45 @@ describe('inventory service getSummary (T-022)', () => {
 
   it('throws NotFoundError for an unknown dealership', () => {
     expect(() => service().getSummary(dealershipId + 1)).toThrow(NotFoundError);
+  });
+});
+
+describe('inventory service getVehicle / getVehicleDetail (T-026)', () => {
+  it('derives the same fields as the list item (age, aging, current action)', () => {
+    const vehicleId = insertVehicle(db, { dealershipId, ageDays: 91 });
+    insertAction(db, { vehicleId, loggedAt: '2026-10-07T09:00:00.000Z' });
+
+    const [listed] = service().listVehicles(dealershipId, defaults).items;
+
+    expect(service().getVehicle(vehicleId)).toEqual(listed);
+    expect(listed).toMatchObject({ daysInStock: 91, isAging: true, needsAttention: false });
+  });
+
+  it('uses the dealership-local today: 23:30 UTC is already the next day in BST', () => {
+    const vehicleId = insertVehicle(db, { dealershipId, stockInDate: '2026-07-09' });
+    const lateEvening = { now: () => new Date('2026-10-07T23:30:00.000Z') };
+
+    expect(service(lateEvening).getVehicle(vehicleId)).toMatchObject({
+      daysInStock: 91,
+      isAging: true,
+    });
+    expect(service().getVehicle(vehicleId)).toMatchObject({ daysInStock: 90, isAging: false });
+  });
+
+  it('adds currency, time zone and the history newest first, id breaking timestamp ties', () => {
+    const vehicleId = insertVehicle(db, { dealershipId, ageDays: 120 });
+    const first = insertAction(db, { vehicleId, loggedAt: '2026-10-07T12:00:00.000Z' });
+    const second = insertAction(db, { vehicleId, loggedAt: '2026-10-07T12:00:00.000Z' });
+    const older = insertAction(db, { vehicleId, loggedAt: '2026-10-06T08:00:00.000Z' });
+
+    const detail = service().getVehicleDetail(vehicleId);
+
+    expect(detail).toMatchObject({ currency: 'GBP', timeZone: 'Europe/London' });
+    expect(detail.actions.map((a) => a.id)).toEqual([second, first, older]);
+  });
+
+  it('throws NotFoundError for an unknown vehicle', () => {
+    expect(() => service().getVehicle(999)).toThrow(NotFoundError);
+    expect(() => service().getVehicleDetail(999)).toThrow(NotFoundError);
   });
 });

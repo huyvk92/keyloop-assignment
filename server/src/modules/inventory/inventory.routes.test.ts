@@ -2,6 +2,7 @@ import { ApiErrorSchema } from '@shared/api/common';
 import {
   FacetsResponseSchema,
   InventorySummarySchema,
+  VehicleDetailSchema,
   VehicleListResponseSchema,
 } from '@shared/api/vehicles';
 import { insertAction, insertDealership, insertVehicle } from '../../../test/factories';
@@ -759,5 +760,115 @@ describe('summary agrees with the list on the seeded data (BR-15, BR-16)', () =>
     } finally {
       await seeded.close();
     }
+  });
+});
+
+describe('GET /api/vehicles/:vehicleId (T-026)', () => {
+  async function detail(id: number | string) {
+    return ctx.app.inject({ method: 'GET', url: `/api/vehicles/${id}` });
+  }
+  async function detailOk(id: number) {
+    const response = await detail(id);
+    expect(response.statusCode).toBe(200);
+    return VehicleDetailSchema.parse(response.json());
+  }
+
+  it('lists 09:00 and 11:00 entries with 11:00 first; current action is the latest (AC-007.4)', async () => {
+    const vehicleId = insertVehicle(ctx.db, { dealershipId, ageDays: 120 });
+    insertAction(ctx.db, {
+      vehicleId,
+      status: 'Under Review',
+      note: null,
+      loggedAt: '2026-10-07T09:00:00.000Z',
+    });
+    insertAction(ctx.db, {
+      vehicleId,
+      status: 'Marketing Promotion',
+      note: 'Weekend offer',
+      loggedBy: 'Sam Lee',
+      loggedAt: '2026-10-07T11:00:00.000Z',
+    });
+
+    const body = await detailOk(vehicleId);
+
+    expect(body.actions).toEqual([
+      {
+        id: expect.any(Number),
+        vehicleId,
+        status: 'Marketing Promotion',
+        note: 'Weekend offer',
+        loggedBy: 'Sam Lee',
+        loggedAt: '2026-10-07T11:00:00.000Z',
+      },
+      {
+        id: expect.any(Number),
+        vehicleId,
+        status: 'Under Review',
+        note: null,
+        loggedBy: 'Jane Smith',
+        loggedAt: '2026-10-07T09:00:00.000Z',
+      },
+    ]);
+    expect(body.currentAction).toEqual({
+      status: 'Marketing Promotion',
+      loggedBy: 'Sam Lee',
+      loggedAt: '2026-10-07T11:00:00.000Z',
+    });
+    expect(body).toMatchObject({ isAging: true, needsAttention: false });
+  });
+
+  it('returns the list item fields plus currency and time zone (AC-004.4)', async () => {
+    const otherId = insertDealership(ctx.db, { currency: 'EUR', timeZone: 'Europe/Dublin' });
+    const vehicleId = insertVehicle(ctx.db, {
+      dealershipId: otherId,
+      stockNumber: 'STK-7001',
+      ageDays: 30,
+    });
+
+    const body = await detailOk(vehicleId);
+    const list = await listOk('', otherId);
+
+    const { currency, timeZone, actions, ...item } = body;
+    expect({ currency, timeZone }).toEqual({ currency: 'EUR', timeZone: 'Europe/Dublin' });
+    expect(item).toEqual(list.items[0]);
+    expect(actions).toEqual([]);
+  });
+
+  it('shows no action as null with an empty history (AC-007.5)', async () => {
+    const vehicleId = insertVehicle(ctx.db, { dealershipId, ageDays: 95 });
+
+    expect(await detailOk(vehicleId)).toMatchObject({
+      currentAction: null,
+      actions: [],
+      isAging: true,
+      needsAttention: true,
+    });
+  });
+
+  it('keeps the history of a non-aging vehicle visible (AC-006.2)', async () => {
+    const vehicleId = insertVehicle(ctx.db, { dealershipId, ageDays: 45 });
+    insertAction(ctx.db, { vehicleId });
+
+    const body = await detailOk(vehicleId);
+
+    expect(body).toMatchObject({ isAging: false, needsAttention: false });
+    expect(body.actions).toHaveLength(1);
+  });
+
+  it('returns 404 for an unknown vehicle', async () => {
+    const response = await detail(999_999);
+
+    expect(response.statusCode).toBe(404);
+    expect(ApiErrorSchema.parse(response.json()).error).toEqual({
+      code: 'NOT_FOUND',
+      message: 'Vehicle 999999 not found',
+    });
+  });
+
+  it.each(['abc', '0', '1e0', '-1'])('returns 400 for the vehicle id %j', async (id) => {
+    const response = await detail(id);
+
+    expect(response.statusCode).toBe(400);
+    expect(ApiErrorSchema.parse(response.json()).error.code).toBe('VALIDATION_ERROR');
   });
 });

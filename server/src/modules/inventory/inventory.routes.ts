@@ -3,12 +3,15 @@ import { DealershipParamsSchema } from '@shared/api/dealerships';
 import {
   FacetsResponseSchema,
   InventorySummarySchema,
+  VehicleDetailSchema,
   VehicleListQuerySchema,
   VehicleListResponseSchema,
+  VehicleParamsSchema,
 } from '@shared/api/vehicles';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Db } from '../../db/connection';
 import type { Clock } from '../../lib/clock';
+import { createActionsRepository } from '../actions/actions.repository';
 import { createDealershipsRepository } from '../dealerships/dealerships.repository';
 import { createInventoryRepository } from './inventory.repository';
 import { createInventoryService } from './inventory.service';
@@ -19,6 +22,7 @@ export const inventoryRoutes: FastifyPluginAsyncZod<Options> = async (app, { db,
   const service = createInventoryService({
     dealerships: createDealershipsRepository(db),
     inventory: createInventoryRepository(db),
+    actions: createActionsRepository(db),
     clock,
   });
 
@@ -62,5 +66,19 @@ export const inventoryRoutes: FastifyPluginAsyncZod<Options> = async (app, { db,
       },
     },
     async (request) => service.getSummary(request.params.dealershipId),
+  );
+
+  app.get(
+    '/vehicles/:vehicleId',
+    {
+      schema: {
+        tags: ['inventory'],
+        summary:
+          'One vehicle with the list fields, the dealership currency and time zone, and its action history newest first',
+        params: VehicleParamsSchema,
+        response: { 200: VehicleDetailSchema, 400: ApiErrorSchema, 404: ApiErrorSchema },
+      },
+    },
+    async (request) => service.getVehicleDetail(request.params.vehicleId),
   );
 };

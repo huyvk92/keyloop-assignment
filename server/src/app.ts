@@ -12,6 +12,7 @@ import {
 import type { Config } from './config';
 import type { Db } from './db/connection';
 import type { Clock } from './lib/clock';
+import { actionRoutes } from './modules/actions/actions.routes';
 import { dealershipRoutes } from './modules/dealerships/dealerships.routes';
 import { inventoryRoutes } from './modules/inventory/inventory.routes';
 import { registerErrorHandler } from './plugins/error-handler';
@@ -44,6 +45,7 @@ export async function buildApp(deps: AppDeps, options: FastifyServerOptions = {}
   await app.register(healthRoutes, { prefix: '/api', db: deps.db, clock: deps.clock });
   await app.register(dealershipRoutes, { prefix: '/api', db: deps.db });
   await app.register(inventoryRoutes, { prefix: '/api', db: deps.db, clock: deps.clock });
+  await app.register(actionRoutes, { prefix: '/api', db: deps.db, clock: deps.clock });
 
   return app;
 }

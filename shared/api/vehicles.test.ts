@@ -12,6 +12,7 @@ import {
   VehicleListItemSchema,
   VehicleListQuerySchema,
   VehicleListResponseSchema,
+  VehicleDetailSchema,
   VehicleParamsSchema,
 } from './vehicles';
 
@@ -121,6 +122,33 @@ describe('VehicleListItemSchema', () => {
   it('wraps items in a paged response', () => {
     const page = { items: [item], total: 1, page: 1, pageSize: 25 };
     expect(VehicleListResponseSchema.parse(page)).toEqual(page);
+  });
+});
+
+describe('VehicleDetailSchema (T-025)', () => {
+  const action = {
+    id: 7,
+    vehicleId: 1,
+    status: 'Marketing Promotion',
+    note: '<b>cut</b>',
+    loggedBy: 'Jane Smith',
+    loggedAt: '2026-10-07T11:00:00.000Z',
+  };
+  const detail = { ...item, currency: 'GBP', timeZone: 'Europe/London', actions: [action] };
+
+  it('is a list item plus currency, time zone and the history', () => {
+    expect(VehicleDetailSchema.parse(detail)).toEqual(detail);
+    expect(VehicleDetailSchema.parse({ ...detail, actions: [] }).actions).toEqual([]);
+  });
+
+  it('rejects a missing history, a bad currency and an invalid history entry', () => {
+    const withoutActions = { ...item, currency: 'GBP', timeZone: 'Europe/London' };
+    expect(VehicleDetailSchema.safeParse(withoutActions).success).toBe(false);
+    expect(VehicleDetailSchema.safeParse({ ...detail, currency: 'POUNDS' }).success).toBe(false);
+    expect(
+      VehicleDetailSchema.safeParse({ ...detail, actions: [{ ...action, status: 'Sold' }] })
+        .success,
+    ).toBe(false);
   });
 });
 

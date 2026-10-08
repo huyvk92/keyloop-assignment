@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CurrentActionSchema } from './actions';
+import { ActionEntrySchema, CurrentActionSchema } from './actions';
 import { intParam } from './common';
 
 /** A vehicle is aging when its age is strictly greater than this (BR-02; fixed, US-014). */
@@ -103,6 +103,18 @@ export type VehicleListResponse = z.infer<typeof VehicleListResponseSchema>;
 
 export const VehicleParamsSchema = z.object({ vehicleId: intParam({ min: 1 }) });
 export type VehicleParams = z.infer<typeof VehicleParamsSchema>;
+
+/**
+ * GET /api/vehicles/:vehicleId - the list item (same derived fields), the dealership's currency
+ * and time zone for display, and the full action history newest first (`loggedAt` desc, then id
+ * desc; BR-13). `actions[0]` is the current action (BR-14); `[]` means "No action".
+ */
+export const VehicleDetailSchema = VehicleListItemSchema.extend({
+  currency: z.string().length(3),
+  timeZone: z.string(),
+  actions: z.array(ActionEntrySchema),
+});
+export type VehicleDetail = z.infer<typeof VehicleDetailSchema>;
 
 /** GET /api/dealerships/:dealershipId/facets - distinct makes A-Z, each with its models A-Z (BR-06). */
 export const FacetsResponseSchema = z.object({

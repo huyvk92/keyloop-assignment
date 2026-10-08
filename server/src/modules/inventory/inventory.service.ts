@@ -3,6 +3,7 @@ import type {
   InventorySummary,
   SortKey,
   SortOrder,
+  VehicleDetail,
   VehicleListItem,
   VehicleListQuery,
   VehicleListResponse,
@@ -10,6 +11,7 @@ import type {
 import type { Clock } from '../../lib/clock';
 import { localDate } from '../../lib/dates';
 import { NotFoundError } from '../../lib/errors';
+import type { ActionsRepository } from '../actions/actions.repository';
 import type { DealershipsRepository } from '../dealerships/dealerships.repository';
 import type {
   InventoryRepository,
@@ -22,6 +24,7 @@ import { ageFilterToDateRange, agingCutoffDate, ageInDays, isAging } from './veh
 type Deps = {
   dealerships: DealershipsRepository;
   inventory: InventoryRepository;
+  actions: ActionsRepository;
   clock: Clock;
 };
 
@@ -85,14 +88,43 @@ function toSummary(totals: SummaryTotals, asOfDate: string): InventorySummary {
   };
 }
 
-export function createInventoryService({ dealerships, inventory, clock }: Deps) {
+export function createInventoryService({ dealerships, inventory, actions, clock }: Deps) {
   function requireDealership(dealershipId: number) {
     const dealership = dealerships.findById(dealershipId);
     if (!dealership) throw new NotFoundError(`Dealership ${dealershipId} not found`);
     return dealership;
   }
 
+  /**
+   * One vehicle with exactly the list's derived fields (age, aging, current action, needs
+   * attention), as of its dealership's local today (BR-01..BR-03, BR-14, BR-16).
+   */
+  function requireVehicle(vehicleId: number) {
+    const row = inventory.findById(vehicleId);
+    if (!row) throw new NotFoundError(`Vehicle ${vehicleId} not found`);
+    // vehicles.dealership_id is a NOT NULL foreign key, so the dealership always exists.
+    const dealership = requireDealership(row.dealershipId);
+    const today = localDate(clock.now(), dealership.timeZone);
+    return { vehicle: toListItem(row, today), dealership };
+  }
+
   return {
+    /** The list item of one vehicle; 404 when unknown. Used by the actions service (BR-09). */
+    getVehicle(vehicleId: number): VehicleListItem {
+      return requireVehicle(vehicleId).vehicle;
+    },
+
+    /** List item + display context + full history newest first (AC-004.4, BR-13, BR-14). */
+    getVehicleDetail(vehicleId: number): VehicleDetail {
+      const { vehicle, dealership } = requireVehicle(vehicleId);
+      return {
+        ...vehicle,
+        currency: dealership.currency,
+        timeZone: dealership.timeZone,
+        actions: actions.listByVehicle(vehicleId),
+      };
+    },
+
     /** Make/model filter options from the dealership's own stock (BR-04, BR-06). */
     getFacets(dealershipId: number): FacetsResponse {
       requireDealership(dealershipId);
