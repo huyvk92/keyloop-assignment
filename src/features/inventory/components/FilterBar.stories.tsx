@@ -2,7 +2,12 @@ import preview from '#.storybook/preview';
 import { delay, http, HttpResponse } from 'msw';
 import { expect } from 'storybook/test';
 import { apiUrl } from '@/lib/http';
+import { fixtureDealerships } from '@/mocks/fixtures';
 import { FilterBar } from './FilterBar';
+import { VehicleTable } from './VehicleTable';
+
+const [birmingham] = fixtureDealerships;
+if (!birmingham) throw new Error('fixture dealerships missing');
 
 const facetsUrl = apiUrl('/dealerships/:dealershipId/facets');
 
@@ -69,6 +74,38 @@ export const FacetsError = meta.story({
     await expect(await canvas.findByRole('alert')).toHaveTextContent(
       "Couldn't load the make and model options.",
     );
+  },
+});
+
+/** "Aging only" narrows the list; the match count is the one polite announcer (AC-002.1). */
+export const AgingOnly = meta.story({
+  play: async ({ canvas, userEvent }) => {
+    await canvas.findByText('30 vehicles in stock');
+    await userEvent.click(canvas.getByRole('checkbox', { name: 'Aging only (over 90 days)' }));
+    await expect(await canvas.findByText('19 vehicles match your filters')).toHaveRole('status');
+  },
+});
+
+/**
+ * With the list: a search that matches nothing shows "No vehicles match your filters"; Clear
+ * filters resets every filter, restores the list and focuses the filter region (AC-002.8).
+ */
+export const FilterThenClear = meta.story({
+  render: (args) => (
+    <div className="space-y-6">
+      <FilterBar {...args} />
+      <VehicleTable dealership={birmingham} />
+    </div>
+  ),
+  play: async ({ canvas, userEvent }) => {
+    await canvas.findByText('30 vehicles in stock');
+    await userEvent.type(canvas.getByRole('searchbox', { name: 'Search' }), 'no-such-vehicle');
+    await expect(await canvas.findByText('No vehicles match your filters')).toBeVisible();
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Clear filters' }));
+    await expect(await canvas.findByText('Showing 1-25 of 30')).toBeVisible();
+    await expect(canvas.getByRole('searchbox', { name: 'Search' })).toHaveValue('');
+    await expect(canvas.getByRole('search', { name: 'Filter vehicles' })).toHaveFocus();
   },
 });
 

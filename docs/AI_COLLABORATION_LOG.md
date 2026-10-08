@@ -591,3 +591,47 @@ Scaffold (`/init-react-app`) -> TDD implementation (`/implement-trd`) -> Review 
       drop characters.
 - **Docs**: the TRD Phase 5 status note and the SDD (§1.2, §2.2, §8.1, §8.6, §6.5, §9, §10.5,
   §10.6) were updated from "in progress" to the verified state.
+
+### 2026-10-08 · implement-trd phase 6 (hardening: T-038..T-042)
+
+- **Setup**: Two agents worked in parallel on disjoint files, each using a private coverage
+  directory (the lesson from Phase 5).
+  - Web (`src/`): T-038 a11y pass, T-039 states matrix, T-040 Storybook plays.
+  - Playwright (`e2e/`, config, CI): T-042.
+- **Playwright output**:
+  - 11 tests against the real API and seed: their own ports, a pinned `APP_TODAY`, a fresh
+    temporary DB, and the local Chrome channel. 3 runs, 0 flakes.
+  - AC-005.4 is now automated: KPI bottom at y=239, all 5 cards in view, in EN and VI.
+  - It found a real bug that jsdom could never show: two quick filter changes dropped the first
+    one, because writers built on the last render's query while React Router had already pushed
+    the URL.
+- **My routing of that bug**: I sent it to the web agent already working in `src/` rather than
+  starting a third agent on the same files. The fix (TA-33) builds on the router's current
+  location, with red-first unit tests.
+- **My verification**:
+  1. I removed the E2E helper's "wait for the select" workaround, and E2E passed 11/11 twice.
+  2. **I then mutation-checked my own guard: with the old code restored, it still passed.** On an
+     idle machine, React re-renders between two Playwright actions. So I wrote
+     `e2e/quick-filters.spec.ts`, which dispatches both changes in one browser task. It fails with
+     the mutation (`?ageBucket=over-90`) and passes with the fix. I restored the file
+     byte-identical and corrected the helper's comment so it no longer claims to be the guard.
+  3. `npm run validate` passed: web 762, API 369, perf 7. E2E passed 12/12.
+- **Web output**:
+  - Regions and headings restructured: no nested region; the list is a section with an `h2`, and
+    focus targets moved to that `h2`.
+  - The paging range is announced once by `MatchCount`.
+  - Contrast computed from the real oklch tokens: 4 pairs below AA fixed, guarded by
+    `contrast.test.ts`.
+  - A 7-region states matrix, plus Storybook plays for the feature states. The agent served the
+    real Storybook and ran all 109 stories in Chrome: plays pass, 0 axe violations, after fixing 3
+    story or app issues.
+  - Bugs found along the way: facets raised an alert on a failed background refresh, and the
+    drawer body was not keyboard-scrollable.
+- **Decision**: I accepted React Router's `UNSAFE_DataRouterContext` (TA-33), with guards and a
+  note to re-run them on upgrade, rather than a write-through ref workaround.
+- **Docs**:
+  - New `docs/ACCESSIBILITY.md` with decisions, the contrast table, automated evidence, and the
+    17-step manual screen-reader checklist (not yet performed).
+  - SDD §1.2, §5.5, §8, §9 and §10.4 updated; README status and the `npm run e2e` command added;
+    T-038..T-042 ticked.
+  - CSV export (Could) remains out, as future work.

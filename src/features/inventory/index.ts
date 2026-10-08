@@ -22,4 +22,4 @@ export { RefreshControl } from './components/RefreshControl';
 export { VehicleTable } from './components/VehicleTable';
 export { useCanonicalSearch } from './hooks/useCanonicalSearch';
 export { useInventorySearchParams } from './hooks/useInventorySearchParams';
-export { LIST_REGION_ID } from './lib/search-params';
+export { LIST_HEADING_ID } from './lib/search-params';

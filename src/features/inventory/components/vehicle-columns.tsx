@@ -45,7 +45,7 @@ export const columns: Column[] = [
         <AgingBadge />
       ) : (
         <>
-          <span aria-hidden="true" className="text-slate-400">
+          <span aria-hidden="true" className="text-slate-500">
             —
           </span>
           <span className="sr-only">{t('inventory.table.notAging')}</span>

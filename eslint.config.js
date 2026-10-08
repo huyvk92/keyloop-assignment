@@ -17,6 +17,10 @@ export default defineConfig([
     'server/coverage',
     'storybook-static',
     'public/mockServiceWorker.js',
+    // Playwright artifacts (the HTML report ships its own JS)
+    'playwright-report',
+    'test-results',
+    'blob-report',
   ]),
   {
     files: ['**/*.{ts,tsx}'],
@@ -104,6 +108,22 @@ export default defineConfig([
       'no-restricted-imports': [
         'error',
         { patterns: [{ group: ['@/*'], message: 'The API must not import web app code (src/).' }] },
+      ],
+    },
+  },
+  {
+    // Playwright (Node): specs drive the app through the browser only. The relative import is
+    // e2e/vite.config.ts extending the app's Vite config.
+    files: ['e2e/**/*.ts', 'playwright.config.ts'],
+    languageOptions: { globals: globals.node },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['@/*'], message: 'E2E tests use the app through the browser, not src/.' },
+          ],
+        },
       ],
     },
   },

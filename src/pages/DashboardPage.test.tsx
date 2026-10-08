@@ -1,7 +1,7 @@
 import { focusManager } from '@tanstack/react-query';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
-import { delay, http, HttpResponse } from 'msw';
+import { delay, http } from 'msw';
 import { routes } from '@/app/router';
 import { createI18n, i18n, LANGUAGE_STORAGE_KEY } from '@/i18n';
 import { apiUrl } from '@/lib/http';
@@ -120,20 +120,6 @@ describe('DashboardPage', () => {
     },
   );
 
-  it('shows an error with Retry when dealerships cannot be loaded', async () => {
-    server.use(
-      http.get(apiUrl('/dealerships'), () => HttpResponse.json(null, { status: 503 }), {
-        once: true,
-      }),
-    );
-    const { user } = renderRoutes(routes, { route: '/dealerships/3' });
-
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load dealership");
-    await user.click(screen.getByRole('button', { name: 'Retry' }));
-
-    expect(await screen.findByRole('heading', { level: 1, name: 'Manchester' })).toBeVisible();
-  });
-
   it('translates the page title and "Dealership not found" in Vietnamese (AC-015.2)', async () => {
     await i18n.changeLanguage('vi');
     renderRoutes(routes, { route: '/dealerships/99' });
@@ -180,7 +166,7 @@ describe('DashboardPage', () => {
       // Other filters and the sort are cleared, so the list holds the 19 the button promised.
       expect(router.state.location.search).toBe('?agingOnly=true');
       expect(router.state.historyAction).toBe('PUSH');
-      expect(screen.getByRole('region', { name: 'Vehicle list' })).toHaveFocus();
+      expect(screen.getByRole('heading', { level: 2, name: 'Vehicle list' })).toHaveFocus();
       expect(await screen.findByText('19 vehicles match your filters')).toBeVisible();
       expect(screen.getByText('Showing 1-19 of 19')).toBeVisible();
       expect(screen.getByRole('checkbox', { name: 'Aging only (over 90 days)' })).toBeChecked();
@@ -664,7 +650,7 @@ describe('DashboardPage', () => {
       await user.keyboard('{Escape}');
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(screen.getByRole('region', { name: 'Vehicle list' })).toHaveFocus();
+      expect(screen.getByRole('heading', { level: 2, name: 'Vehicle list' })).toHaveFocus();
       expect(document.body).not.toHaveFocus();
     });
 

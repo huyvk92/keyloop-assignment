@@ -223,7 +223,7 @@ describe('AgingSection', () => {
     // Other filters, sort and page are replaced, so the list shows exactly the 19 (TA-29).
     expect(router.state.location.search).toBe('?agingOnly=true');
     expect(router.state.historyAction).toBe('PUSH');
-    expect(screen.getByRole('region', { name: 'Vehicle list' })).toHaveFocus();
+    expect(screen.getByRole('heading', { level: 2, name: 'Vehicle list' })).toHaveFocus();
     expect(await screen.findByText('Showing 1-19 of 19')).toBeVisible();
   });
 

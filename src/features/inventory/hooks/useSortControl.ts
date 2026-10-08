@@ -28,7 +28,7 @@ type Requested = { sort: SortState; dealershipId: number; filters: string; shown
  * update, so a fresh request can't be lost while its navigation is pending.
  */
 export function useSortControl(dealershipId: number) {
-  const { query, setSort } = useInventorySearchParams(dealershipId);
+  const { query, latestQuery, setSort } = useInventorySearchParams(dealershipId);
   const [requested, setRequested] = useState<Requested | null>(null);
   const current: SortState = { sort: query.sort, order: effectiveOrder(query.sort, query.order) };
   const filters = filtersOf(query);
@@ -42,9 +42,14 @@ export function useSortControl(dealershipId: number) {
   if (requested && !matches && (requested.shown || !sameResult)) setRequested(null);
 
   const sortBy = (key: SortKey) => {
-    const next = nextSort(current, key);
+    // From the latest URL, so a second click before the re-render toggles the first one's sort.
+    const latest = latestQuery();
+    const next = nextSort(
+      { sort: latest.sort, order: effectiveOrder(latest.sort, latest.order) },
+      key,
+    );
     setSort(next.sort, urlOrder(next));
-    setRequested({ sort: next, dealershipId, filters, shown: false });
+    setRequested({ sort: next, dealershipId, filters: filtersOf(latest), shown: false });
   };
 
   return { ...current, sortBy, announced: matches ? requested.sort : null };

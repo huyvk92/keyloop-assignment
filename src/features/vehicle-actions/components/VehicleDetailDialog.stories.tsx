@@ -1,9 +1,10 @@
 import preview from '#.storybook/preview';
 import { delay, http, HttpResponse } from 'msw';
 import { useState } from 'react';
-import { expect, fn } from 'storybook/test';
+import { expect, fn, within } from 'storybook/test';
 import { Button } from '@/components/Button';
 import { apiUrl } from '@/lib/http';
+import { resetMockActionStore } from '@/mocks/action-store';
 import { FIXTURE_HISTORY_VEHICLES } from '@/mocks/fixtures';
 import { VehicleDetailDialog } from './VehicleDetailDialog';
 
@@ -27,6 +28,7 @@ function VehicleDrawerDemo({ vehicleId, onClose }: DemoProps) {
 }
 
 const detailUrl = apiUrl('/vehicles/:vehicleId');
+const actionsUrl = apiUrl('/vehicles/:vehicleId/actions');
 
 const meta = preview.meta({
   title: 'Vehicle actions/VehicleDetailDialog',
@@ -65,6 +67,58 @@ export const MarkupNote = meta.story({
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole('button', { name: 'View vehicle' }));
     await expect(await canvas.findByText('<b>cut</b>')).toBeVisible();
+  },
+});
+
+/** Saving with nothing filled in: field errors, nothing sent (AC-006.4). */
+export const ValidationError = meta.story({
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole('button', { name: 'View vehicle' }));
+    const save = await canvas.findByRole('button', { name: 'Save action' });
+    await userEvent.click(save);
+    await expect(await canvas.findByText('Select an action status.')).toBeVisible();
+    await expect(canvas.getByText('Enter your name.')).toBeVisible();
+    await expect(canvas.getByRole('radio', { name: 'Price Reduction Planned' })).toHaveFocus();
+  },
+});
+
+/** A valid save: "Action saved", and the new entry heads the history (AC-006.3, BR-13). */
+export const SaveSuccess = meta.story({
+  // The mock store is shared by the stories: start each run from the fixtures.
+  beforeEach() {
+    resetMockActionStore();
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole('button', { name: 'View vehicle' }));
+    await userEvent.click(await canvas.findByRole('radio', { name: 'Price Reduction Planned' }));
+    await userEvent.type(canvas.getByRole('textbox', { name: 'Note (optional)' }), 'Reduce by 5%');
+    // Cleared first: a name remembered by an earlier save in this browser is pre-filled (US-012).
+    await userEvent.clear(canvas.getByRole('textbox', { name: 'Logged by' }));
+    await userEvent.type(canvas.getByRole('textbox', { name: 'Logged by' }), 'Jane Smith');
+    await userEvent.click(canvas.getByRole('button', { name: 'Save action' }));
+    await expect(await canvas.findByText('Action saved')).toBeVisible();
+    const history = await canvas.findByRole('list', { name: 'Action history, newest first' });
+    await expect(await within(history).findByText('Reduce by 5%')).toBeVisible();
+  },
+});
+
+/** The save fails (503): a mapped alert takes focus, every input is kept for a retry (AC-006.7). */
+export const SaveError = meta.story({
+  beforeEach({ msw }) {
+    msw.use(http.post(actionsUrl, () => HttpResponse.json(null, { status: 503 })));
+  },
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole('button', { name: 'View vehicle' }));
+    await userEvent.click(await canvas.findByRole('radio', { name: 'Under Review' }));
+    // Cleared first: a name remembered by an earlier save in this browser is pre-filled (US-012).
+    await userEvent.clear(canvas.getByRole('textbox', { name: 'Logged by' }));
+    await userEvent.type(canvas.getByRole('textbox', { name: 'Logged by' }), 'Jane Smith');
+    await userEvent.click(canvas.getByRole('button', { name: 'Save action' }));
+    const alert = await canvas.findByRole('alert');
+    await expect(alert).toHaveTextContent("Couldn't save the action");
+    await expect(alert).toHaveFocus();
+    await expect(canvas.getByRole('radio', { name: 'Under Review' })).toBeChecked();
+    await expect(canvas.getByRole('textbox', { name: 'Logged by' })).toHaveValue('Jane Smith');
   },
 });
 

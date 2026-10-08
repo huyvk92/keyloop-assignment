@@ -32,9 +32,10 @@ export function VehicleTableView({ vehicles, dealership, onSelectVehicle, sortin
   const context: RenderContext = { dealership, t, format };
   const shown = onSelectVehicle ? [viewColumn(onSelectVehicle), ...columns] : columns;
   return (
-    // Focusable, labelled scroll container so keyboard users can scroll the table (NFR-07).
+    // Focusable, labelled scroll container so keyboard users can scroll the table (NFR-07). A
+    // named group, not a region: it sits inside the "Vehicle list" region (T-038).
     <div
-      role="region"
+      role="group"
       aria-labelledby={captionId}
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrollable region must be keyboard-focusable (WCAG 2.1.1)
       tabIndex={0}

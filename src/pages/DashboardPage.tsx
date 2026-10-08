@@ -9,7 +9,7 @@ import {
   AgingSection,
   FilterBar,
   KpiCards,
-  LIST_REGION_ID,
+  LIST_HEADING_ID,
   RefreshControl,
   useCanonicalSearch,
   VehicleTable,
@@ -17,7 +17,7 @@ import {
 import { useVehicleSelection, VehicleDetailDialog, vehicleKeys } from '@/features/vehicle-actions';
 import { shouldKeepFocus } from '@/lib/navigation-focus';
 
-const listRegion = () => document.getElementById(LIST_REGION_ID);
+const listHeading = () => document.getElementById(LIST_HEADING_ID);
 
 /** `/dealerships/:dealershipId`: the dealership comes from the path (ADR-008, AC-008.3). */
 export function DashboardPage() {
@@ -96,11 +96,11 @@ export function DashboardPage() {
         onSelectVehicle={selectVehicle}
       />
       {/* If the opening row is gone on close (e.g. a saved action took the vehicle out of a
-          "Needs attention" list), focus goes to the list region it was in (ADR-006). */}
+          "Needs attention" list), focus goes to the heading of the list it was in (ADR-006). */}
       <VehicleDetailDialog
         vehicleId={selectedVehicleId}
         onClose={clearSelection}
-        returnFocusFallback={listRegion}
+        returnFocusFallback={listHeading}
       />
     </PageSection>
   );

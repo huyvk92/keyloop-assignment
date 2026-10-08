@@ -7,7 +7,7 @@ import { LoadingState } from '@/components/LoadingState';
 import { useFormatters } from '@/lib/use-formatters';
 import { useAgingStock } from '../api/inventory.queries';
 import { useInventorySearchParams } from '../hooks/useInventorySearchParams';
-import { LIST_REGION_ID } from '../lib/search-params';
+import { LIST_HEADING_ID } from '../lib/search-params';
 import { AgingList } from './AgingList';
 
 type Props = {
@@ -20,7 +20,7 @@ type Props = {
  * "Aging stock" (US-004): the dealership's 10 oldest vehicles over 90 days with age and current
  * action, independent of the list's filters (AC-004.1, TA-11), with loading, error (Retry),
  * empty ("No aging stock", AC-004.2) and success states. "View all N aging vehicles" replaces
- * the list's filters with Aging only (AC-004.3, TA-29) and moves focus to the list.
+ * the list's filters with Aging only (AC-004.3, TA-29) and moves focus to the list's heading.
  *
  * Adds no live region of its own (loading is `aria-busy` on the section, not a status): the filter
  * bar's match count is the single announcer of result changes. A failed background refresh keeps
@@ -36,8 +36,8 @@ export function AgingSection({ dealershipId, onSelectVehicle }: Props) {
   const viewAll = () => {
     // Only agingOnly, so the list shows exactly the N the button promises (TA-29).
     replaceFilters({ agingOnly: true });
-    // The list region stays mounted while its results load, so focus lands on the results.
-    document.getElementById(LIST_REGION_ID)?.focus();
+    // The list's heading stays mounted while its results load, so focus lands on the results.
+    document.getElementById(LIST_HEADING_ID)?.focus();
   };
 
   let body: ReactNode;

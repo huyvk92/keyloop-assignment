@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { delay, http, HttpResponse } from 'msw';
 import { FilterBar, VehicleTable } from '@/features/inventory';
 import { i18n } from '@/i18n';
@@ -620,5 +620,99 @@ describe('VehicleTable', () => {
       );
       expect(announcements).toHaveLength(3);
     });
+  });
+
+  describe('structure and paging announcements (T-038)', () => {
+    /** The visible (not live) summary; the match count may hold the same words, visually hidden. */
+    const pagingSummary = async (text: string) =>
+      within(await screen.findByRole('navigation', { name: 'Pagination' })).findByText(text);
+
+    function renderWithFilters(search = '') {
+      return renderWithProviders(
+        <>
+          <FilterBar dealershipId={1} />
+          <VehicleTable dealership={birmingham} />
+        </>,
+        { route: `/dealerships/1${search}`, path: '/dealerships/:dealershipId' },
+      );
+    }
+
+    it('is one "Vehicle list" region named by its h2, with a focusable scroll group inside, not a nested region', async () => {
+      renderTable();
+      const table = await screen.findByRole('table', { name: 'Vehicles in stock at Birmingham' });
+
+      const regions = screen.getAllByRole('region');
+      expect(regions).toHaveLength(1);
+      const [region] = regions;
+      expect(region).toHaveAccessibleName('Vehicle list');
+      const heading = within(region as HTMLElement).getByRole('heading', {
+        level: 2,
+        name: 'Vehicle list',
+      });
+      // Programmatic focus target only (View all, drawer fallback); not a Tab stop.
+      expect(heading).toHaveAttribute('tabindex', '-1');
+      const scroller = screen.getByRole('group', { name: 'Vehicles in stock at Birmingham' });
+      expect(scroller).toContainElement(table);
+      expect(scroller).toHaveAttribute('tabindex', '0');
+    });
+
+    it('announces the new range once per page change, keeping focus on the paging button', async () => {
+      const { user } = renderWithFilters();
+      await pagingSummary('Showing 1-25 of 30');
+      const { announcements } = recordAnnouncements();
+
+      const next = screen.getByRole('button', { name: 'Next page' });
+      await user.click(next);
+      await pagingSummary('Showing 26-30 of 30');
+      await waitFor(() => expect(announcements).toHaveLength(1));
+      expect(announcements).toEqual(['30 vehicles in stock Showing 26-30 of 30']);
+      expect(next).toHaveFocus();
+
+      await user.click(screen.getByRole('button', { name: 'Previous page' }));
+      await pagingSummary('Showing 1-25 of 30');
+      await waitFor(() => expect(announcements).toHaveLength(2));
+      expect(announcements[1]).toBe('30 vehicles in stock Showing 1-25 of 30');
+      // The visible count is unchanged; the range is for screen readers only.
+      expect(screen.getByText('Showing 1-25 of 30', { selector: '.sr-only' })).toBeInTheDocument();
+    });
+
+    it('does not announce the range for a poll of the same page, nor for a filter or sort change', async () => {
+      const { user, queryClient } = renderWithFilters('?page=2');
+      await pagingSummary('Showing 26-30 of 30');
+      const { announcements } = recordAnnouncements();
+
+      await act(() => queryClient.refetchQueries());
+      expect(announcements).toEqual([]);
+
+      await user.click(screen.getByRole('button', { name: 'List price' }));
+      await pagingSummary('Showing 1-25 of 30');
+      await user.selectOptions(screen.getByRole('combobox', { name: 'Make' }), 'Ford');
+      await screen.findByText('6 vehicles match your filters');
+
+      expect(announcements).toEqual([
+        'Sorted by price, ascending',
+        '6 vehicles match your filters',
+      ]);
+    });
+  });
+
+  it('toggles to descending on a second header click made before the re-render (Phase 6 bug)', async () => {
+    const { router } = renderTable();
+    const price = await screen.findByRole('button', { name: 'List price' });
+
+    // Two clicks in one tick: the second must toggle the first one's sort, not the rendered one.
+    // eslint-disable-next-line testing-library/no-unnecessary-act -- the outer act keeps both clicks in one tick (nested acts do not flush), so React cannot re-render in between
+    act(() => {
+      fireEvent.click(price);
+      fireEvent.click(price);
+    });
+
+    expect(router.state.location.search).toBe('?sort=price&order=desc');
+    await waitFor(() =>
+      expect(screen.getByRole('columnheader', { name: 'List price' })).toHaveAttribute(
+        'aria-sort',
+        'descending',
+      ),
+    );
   });
 });

@@ -111,7 +111,7 @@ export const en = {
       refreshFailed: "Couldn't refresh aging stock. Showing the last loaded vehicles.",
     },
     list: {
-      /** Accessible name of the list region; focus target of "View all aging vehicles". */
+      /** Visible h2 naming the list region; focus target of "View all aging vehicles". */
       label: 'Vehicle list',
       loading: 'Loading vehicles…',
       loadError: "Couldn't load vehicles",
@@ -130,6 +130,7 @@ export const en = {
     },
     /** FilterBar and AgeRangeFilter (US-002). Filter values (make, model) are data, never translated. */
     filters: {
+      /** Visually hidden h2 naming the search landmark. */
       label: 'Filter vehicles',
       search: {
         label: 'Search',

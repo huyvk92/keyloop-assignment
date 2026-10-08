@@ -178,4 +178,66 @@ describe('useInventorySearchParams', () => {
     expect(result.current.navigationType).toBe('REPLACE');
     expect(result.current.searchFor(4)).toBe('?make=Ford&sort=price&order=desc&page=4');
   });
+
+  describe('writes made before the router re-renders (Phase 6 bug: lost first filter)', () => {
+    // React Router updates the URL before React re-renders with it (100-250 ms in Chrome). Two
+    // writes in one tick reproduce that window deterministically: the second must build on the
+    // first, not on the query of the last render.
+    it('keeps both of two filter changes', () => {
+      const result = setup('/dealerships/1');
+
+      act(() => {
+        result.current.setFilter('make', 'Ford');
+        result.current.setFilter('ageBucket', 'over-90');
+      });
+
+      expect(result.current.location.search).toBe('?make=Ford&ageBucket=over-90');
+    });
+
+    it('builds every writer on the latest URL: sort, page, search, range', () => {
+      const result = setup('/dealerships/1?make=Ford');
+
+      act(() => {
+        result.current.setSort('price', 'desc');
+        result.current.setPage(2);
+      });
+      expect(result.current.location.search).toBe('?make=Ford&sort=price&order=desc&page=2');
+
+      act(() => {
+        result.current.setSearch('stk');
+        result.current.setFilters({ minAge: 10, maxAge: 20 });
+      });
+      expect(result.current.location.search).toBe(
+        '?make=Ford&minAge=10&maxAge=20&q=stk&sort=price&order=desc',
+      );
+    });
+
+    it('refines a search committed in the same tick with replace (TA-28)', () => {
+      const result = setup('/dealerships/1');
+
+      act(() => {
+        result.current.setSearch('st');
+        result.current.setSearch('stk');
+      });
+
+      expect(result.current.location.search).toBe('?q=stk');
+      expect(result.current.navigationType).toBe('REPLACE');
+    });
+
+    it('keeps the sort and page size for Clear filters and View all after a pending write', () => {
+      const result = setup('/dealerships/1?make=Ford&pageSize=50');
+
+      act(() => {
+        result.current.setSort('price');
+        result.current.clearFilters();
+      });
+      expect(result.current.location.search).toBe('?sort=price&pageSize=50');
+
+      act(() => {
+        result.current.setFilter('make', 'Ford');
+        result.current.replaceFilters({ agingOnly: true });
+      });
+      expect(result.current.location.search).toBe('?agingOnly=true&pageSize=50');
+    });
+  });
 });

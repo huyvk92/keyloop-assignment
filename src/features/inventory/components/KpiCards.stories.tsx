@@ -1,6 +1,6 @@
 import preview from '#.storybook/preview';
 import { delay, http, HttpResponse } from 'msw';
-import { expect } from 'storybook/test';
+import { expect, waitFor } from 'storybook/test';
 import { apiUrl } from '@/lib/http';
 import { KpiCards } from './KpiCards';
 
@@ -18,8 +18,9 @@ const meta = preview.meta({
 /** The five whole-stock KPIs on one row from `lg` (AC-005.1, AC-010.1). */
 export const Default = meta.story({
   play: async ({ canvas }) => {
+    // The <dd> exists while loading (skeleton), so wait for its value, not only the element.
     const total = await canvas.findByRole('definition', { name: 'Total vehicles' });
-    await expect(total).toHaveTextContent('30');
+    await waitFor(() => expect(total).toHaveTextContent('30'));
     await expect(canvas.getByRole('definition', { name: 'Aging' })).toHaveTextContent('19');
     await expect(canvas.getByRole('definition', { name: 'Needs attention' })).toHaveTextContent(
       '12',

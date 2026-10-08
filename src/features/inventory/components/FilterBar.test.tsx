@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { FilterBar } from '@/features/inventory';
@@ -361,5 +361,26 @@ describe('FilterBar', () => {
       make: 'Ford',
       ageBucket: 'over-90',
     });
+  });
+
+  it('keeps both of two quick changes made before the list re-renders (Phase 6 bug)', async () => {
+    const { router } = renderFilterBar();
+    await screen.findByText('30 vehicles in stock');
+    const make = screen.getByRole('combobox', { name: 'Make' });
+    await within(make).findByRole('option', { name: 'Ford' });
+    const bucket = screen.getByRole('combobox', { name: 'Days in stock' });
+
+    // Both changes in one tick, i.e. before the router's re-render (user-event would let React
+    // re-render between the two): the second change must not drop the first.
+    // eslint-disable-next-line testing-library/no-unnecessary-act -- the outer act keeps both events in one tick (nested acts do not flush), so React cannot re-render in between
+    act(() => {
+      fireEvent.change(make, { target: { value: 'Ford' } });
+      fireEvent.change(bucket, { target: { value: 'over-90' } });
+    });
+
+    expect(router.state.location.search).toBe('?make=Ford&ageBucket=over-90');
+    expect(await screen.findByText(/vehicles? match(es)? your filters/)).toBeVisible();
+    expect(make).toHaveDisplayValue('Ford');
+    expect(bucket).toHaveDisplayValue('Over 90 days');
   });
 });

@@ -122,14 +122,15 @@ docs/                PRD, TRD, System Design, AI collaboration log, screenshots
 
 ## Scripts
 
-| Command                     | What it does                                                                                     |
-| --------------------------- | ------------------------------------------------------------------------------------------------ |
-| `npm run dev`               | Web + API with hot reload                                                                        |
-| `npm run validate`          | Quality gate: typecheck, lint, format check, web and API tests with coverage, isolated perf test |
-| `npm run build`             | Production build of the web app                                                                  |
-| `npm run storybook`         | Component explorer at http://localhost:6006                                                      |
-| `npm run seed:api`          | Migrate and seed the database file                                                               |
-| `npm run test` / `test:api` | Watch-mode tests for web / API                                                                   |
+| Command                     | What it does                                                                                       |
+| --------------------------- | -------------------------------------------------------------------------------------------------- |
+| `npm run dev`               | Web + API with hot reload                                                                          |
+| `npm run validate`          | Quality gate: typecheck, lint, format check, web and API tests with coverage, isolated perf test   |
+| `npm run build`             | Production build of the web app                                                                    |
+| `npm run storybook`         | Component explorer at http://localhost:6006                                                        |
+| `npm run seed:api`          | Migrate and seed the database file                                                                 |
+| `npm run test` / `test:api` | Watch-mode tests for web / API                                                                     |
+| `npm run e2e`               | Playwright end-to-end tests: starts its own API (3101, pinned `APP_TODAY`, temp DB) and web (4173) |
 
 To work on the UI without the API, set `VITE_USE_MOCKS=true` in `.env`. MSW then serves the same
 contract in the browser.
@@ -144,8 +145,9 @@ contract in the browser.
 - **Parity:** shared scenario tables (`shared/api/*.cases.ts`) run against both the real API and
   the MSW mock, so the mock used by web tests cannot drift from the server. They have already
   caught real divergences.
-- **Real browser:** key flows were checked in headless Chrome against the real API, with axe
-  accessibility checks. See the AI collaboration log.
+- **End-to-end:** Playwright drives Chrome against the real API and seed (`npm run e2e`): the full
+  log-an-action journey, dealership switch, language, keyboard, axe, and the KPIs-above-the-fold
+  check at 1280x800.
 
 ## Documentation
 
@@ -155,6 +157,7 @@ contract in the browser.
 | [docs/PRD.md](docs/PRD.md)                                   | Requirements: user stories, acceptance criteria, business rules, assumptions |
 | [docs/TRD.md](docs/TRD.md)                                   | Technical design, ADRs, task plan with status                                |
 | [docs/AI_COLLABORATION_LOG.md](docs/AI_COLLABORATION_LOG.md) | How AI was directed, verified and corrected, step by step                    |
+| [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md)               | Accessibility decisions, contrast table, manual screen-reader checklist      |
 | [docs/ASSIGNMENT.md](docs/ASSIGNMENT.md)                     | The original brief                                                           |
 
 This project was built with Claude Code as a directed collaborator. Custom agents (BA, architect,
@@ -165,13 +168,11 @@ in the collaboration log.
 
 ## Status
 
-- **Done and committed:** requirements 1-3, English/Vietnamese UI, dealership dropdown, KPIs and
-  aging section, vehicle drawer with action history and logging.
-- **In progress:** Refresh / "Last updated", the "Needs attention" KPI, label and filter,
-  sortable column headers, and remembering the "Logged by" name. These are implemented and in
-  review fixes, not yet committed.
-- **Planned:** a full accessibility pass with a real screen reader, Playwright end-to-end tests,
-  and an optional CSV export. A configurable aging threshold is out of scope (fixed at 90 days).
+- **Done:** requirements 1-3; English/Vietnamese UI; dealership dropdown; KPIs including "Needs
+  attention"; aging section; sortable columns; Refresh with "Last updated"; remembered "Logged by"
+  name; accessibility pass ([docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md)); Playwright E2E.
+- **Not done:** a manual screen-reader pass (checklist ready), the optional CSV export, and a
+  configurable aging threshold (out of scope, fixed at 90 days).
 
 ## Troubleshooting
 

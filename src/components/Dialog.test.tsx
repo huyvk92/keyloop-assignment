@@ -214,4 +214,28 @@ describe('Dialog (ADR-006, AC-004.4, NFR-01)', () => {
 
     expect(screen.getByRole('button', { name: 'Đóng' })).toBeInTheDocument();
   });
+
+  it('only slides in when the user allows motion (prefers-reduced-motion, T-038)', async () => {
+    const { dialog } = await openDialog();
+
+    // jsdom can't evaluate the media query; every movement utility must sit behind `motion-safe:`
+    // so it compiles to `@media (prefers-reduced-motion: no-preference)`.
+    const motion = dialog.className
+      .split(/\s+/)
+      .filter((name) => /transition|duration|ease|translate/.test(name));
+    expect(motion.length).toBeGreaterThan(0);
+    expect(motion.filter((name) => !name.includes('motion-safe:'))).toEqual([]);
+  });
+
+  it('makes the scrollable body a keyboard-focusable group named by the title (WCAG 2.1.1)', async () => {
+    const { user } = await openDialog();
+
+    const body = screen.getByRole('group', { name: 'STK-1042 Ford Focus' });
+    expect(body).toContainElement(screen.getByRole('textbox', { name: 'Note' }));
+    // Heading (focused on open) → Close → the body itself → its content.
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus();
+    await user.tab();
+    expect(body).toHaveFocus();
+  });
 });

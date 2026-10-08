@@ -1,4 +1,5 @@
 import { AGE_BUCKETS, type AgeBucket } from '@shared/api/vehicles';
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox } from '@/components/Checkbox';
 import { Field } from '@/components/Field';
@@ -32,16 +33,22 @@ export function FilterBar({ dealershipId }: Props) {
     useInventorySearchParams(dealershipId);
   // "Clear filters" remounts the draft-holding controls, dropping unapplied input (AC-002.8).
   const resetKey = useFilterResetKey();
+  const headingId = useId();
 
   return (
     <div
       id={FILTER_REGION_ID}
       role="search"
-      aria-label={t('inventory.filters.label')}
+      aria-labelledby={headingId}
       // Programmatic focus target only (after "Clear filters"); not in the tab order.
       tabIndex={-1}
       className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none"
     >
+      {/* Visually hidden: the boxed controls are self-evident on screen, and the vertical space is
+          needed above the fold (AC-005.4); heading navigation still finds the section (T-038). */}
+      <h2 id={headingId} className="sr-only">
+        {t('inventory.filters.label')}
+      </h2>
       {/* Top-aligned: labels line up, and the search hint may hang below its box. */}
       <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
         <SearchFilter

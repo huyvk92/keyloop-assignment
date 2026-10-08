@@ -140,10 +140,12 @@ export function hasActiveFilters(query: VehicleListQuery): boolean {
 export const FILTER_REGION_ID = 'inventory-filters';
 
 /**
- * DOM id of the vehicle list region (one per page). "View all aging vehicles" moves focus here so
- * keyboard and screen reader users land on the results it filtered (TA-11).
+ * DOM id of the vehicle list's `<h2>` (one per page), which also names the list region. "View all
+ * aging vehicles" and the drawer's focus fallback move focus here, so keyboard and screen reader
+ * users land on the results ("Vehicle list, heading level 2") rather than on a container whose
+ * whole content some screen readers would read out (TA-11, ADR-006, T-038).
  */
-export const LIST_REGION_ID = 'inventory-list';
+export const LIST_HEADING_ID = 'inventory-list';
 
 /**
  * Router location state of the navigation made by "Clear filters" (AC-002.8). Clearing can leave

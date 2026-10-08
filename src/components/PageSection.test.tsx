@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { PageSection } from '@/components/PageSection';
 
 describe('PageSection', () => {
-  it('labels the section with a focused h1 and renders actions and content', () => {
+  it('renders a focused h1, actions and content without adding a landmark', () => {
     render(
       <PageSection title="Leeds" actions={<button type="button">Refresh</button>}>
         <p>Content</p>
@@ -11,7 +11,8 @@ describe('PageSection', () => {
 
     const heading = screen.getByRole('heading', { level: 1, name: 'Leeds' });
     expect(heading).toHaveFocus();
-    expect(screen.getByRole('region', { name: 'Leeds' })).toContainElement(heading);
+    // <main> is the landmark; a page-level region would duplicate it (T-038).
+    expect(screen.queryByRole('region')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeVisible();
     expect(screen.getByText('Content')).toBeVisible();
     expect(document.title).toBe('Leeds · Inventory dashboard');

@@ -150,7 +150,18 @@ export function Dialog({
               </svg>
             </Button>
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">{children}</div>
+          {/* Focusable, so the body scrolls by keyboard even without a focusable child (e.g. a
+              long, read-only history; WCAG 2.1.1, axe scrollable-region-focusable). A group named
+              by the title, not a region: no landmark inside the dialog (T-038). */}
+          <div
+            role="group"
+            aria-labelledby={titleId}
+            // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrollable area must be keyboard-focusable
+            tabIndex={0}
+            className="min-h-0 flex-1 overflow-y-auto px-6 py-4 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:outline-none focus-visible:ring-inset"
+          >
+            {children}
+          </div>
           {footer && (
             <footer className="flex flex-wrap justify-end gap-2 border-t border-slate-200 px-6 py-4">
               {footer}

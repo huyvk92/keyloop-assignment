@@ -4,7 +4,7 @@
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Brief   | `docs/ASSIGNMENT.md` (Keyloop, domain "Supply")                                                                                           |
 | Sources | `docs/PRD.md` v0.3, `docs/TRD.md` (ADR-001..009, TA-01..32), `docs/AI_COLLABORATION_LOG.md`, code on branch `feature/inventory-dashboard` |
-| Code    | Phases 1-5 committed on `feature/inventory-dashboard` (see §1.2); Phase 6 not started                                                     |
+| Code    | Phases 1-6 on `feature/inventory-dashboard` (see §1.2); optional CSV export not done                                                      |
 | Updated | 2026-10-08                                                                                                                                |
 
 This document describes the code that exists, not the plan. Where the TRD and the code differ,
@@ -38,17 +38,17 @@ guide: demo walkthrough with `APP_TODAY`, reset, API table, troubleshooting.
 
 ### 1.2 Delivery status
 
-| Phase                                     | Tasks                                     | Status                                  |
-| ----------------------------------------- | ----------------------------------------- | --------------------------------------- |
-| 1 Foundation + vertical slice             | T-001..T-012                              | Committed (`d8bf28a`, `76fa3d9`)        |
-| 1b English / Vietnamese                   | T-045..T-047                              | Committed (`bf5a91a`)                   |
-| Pulled forward: form primitives, dropdown | T-017, T-033                              | Committed (`cf8c88e`)                   |
-| 2 Filters, search, sort API, facets       | T-013..T-016, T-018..T-020                | Committed (`397e8de`, `2ec3efe`)        |
-| 3 KPIs + aging section                    | T-021..T-024                              | Committed (`74a7698`, `44ff632`)        |
-| 4 Log + persist actions                   | T-025..T-032                              | Committed (`2431bca`, `6e9822c`)        |
-| 5 Should stories                          | T-034..T-037                              | Done, review fix round completed (§8.6) |
-| 6 Hardening                               | T-038..T-042 (+ optional T-043/T-044 CSV) | **Not started**, see §9                 |
-| Won't                                     | US-014 configurable threshold             | Not planned (fixed 90 days)             |
+| Phase                                     | Tasks                         | Status                                                                  |
+| ----------------------------------------- | ----------------------------- | ----------------------------------------------------------------------- |
+| 1 Foundation + vertical slice             | T-001..T-012                  | Committed (`d8bf28a`, `76fa3d9`)                                        |
+| 1b English / Vietnamese                   | T-045..T-047                  | Committed (`bf5a91a`)                                                   |
+| Pulled forward: form primitives, dropdown | T-017, T-033                  | Committed (`cf8c88e`)                                                   |
+| 2 Filters, search, sort API, facets       | T-013..T-016, T-018..T-020    | Committed (`397e8de`, `2ec3efe`)                                        |
+| 3 KPIs + aging section                    | T-021..T-024                  | Committed (`74a7698`, `44ff632`)                                        |
+| 4 Log + persist actions                   | T-025..T-032                  | Committed (`2431bca`, `6e9822c`)                                        |
+| 5 Should stories                          | T-034..T-037                  | Done, review fix round completed (§8.6)                                 |
+| 6 Hardening                               | T-038..T-042                  | Done: a11y pass, states matrix, Storybook plays, README, Playwright E2E |
+| Won't                                     | US-014 configurable threshold | Not planned (fixed 90 days)                                             |
 
 ## 2. Requirements summary
 
@@ -262,7 +262,7 @@ flowchart TD
   DashboardPage --> KpiCards["KpiCards: Total, Aging, % aging, Avg days, Needs attention*"]
   DashboardPage --> AgingSection["AgingSection → AgingList (10 oldest, View all N)"]
   DashboardPage --> FilterBar["FilterBar: MakeModelFilters, AgeRangeFilter, aging only, needs attention*, SearchFilter, MatchCount, Clear"]
-  DashboardPage --> VehicleTable["VehicleTable (#inventory-list region, sort status)"]
+  DashboardPage --> VehicleTable["VehicleTable (Vehicle list section, sort status)"]
   VehicleTable --> Content["VehicleTableContent → VehicleTableView: SortableHeader*, AgingBadge, AttentionBadge*, View button"]
   Content --> Pagination
   DashboardPage --> Dialog["VehicleDetailDialog (native dialog, right drawer at md+)"]
@@ -319,23 +319,26 @@ flowchart TD
 **Single-announcer rule.** Each kind of change has exactly one polite announcer, and background
 changes are silent:
 
-| Event                        | Announcer                                                       | Silent cases                                                                                  |
-| ---------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Result set changes (filters) | `MatchCount` (`role="status"`)                                  | Keystrokes (debounced), 60 s polls and language switches (region remounted with the new text) |
-| Sort change                  | Visually hidden status in `VehicleTable`, one-shot per click    | Reload, Back/Forward, filter or dealership round trips (open MAJOR, §8.6)                     |
-| Refresh                      | None (TA-31): button label "Refreshing…", then the visible time | -                                                                                             |
-| Save                         | "Action saved" (`role="status"`) inside the form                | -                                                                                             |
-| Errors                       | `ErrorState` / form alert (`role="alert"`)                      | Failed background refetch shows a quiet stale hint, not an alert                              |
+| Event                                | Announcer                                                                           | Silent cases                                                                                  |
+| ------------------------------------ | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Result set changes (filters, paging) | `MatchCount` (`role="status"`); on page-only changes it adds "Showing 26-50 of 360" | Keystrokes (debounced), 60 s polls and language switches (region remounted with the new text) |
+| Sort change                          | Visually hidden status in the Vehicle list section, one-shot per click              | Reload, Back/Forward, filter or dealership round trips                                        |
+| Refresh                              | None (TA-31): button label "Refreshing…", then the visible time                     | -                                                                                             |
+| Save                                 | "Action saved" (`role="status"`) inside the form                                    | -                                                                                             |
+| Errors                               | `ErrorState` / form alert (`role="alert"`)                                          | Failed background refetch shows a quiet stale hint, not an alert                              |
 
-Pagination summary ("Showing 26-50 of 312") is visible but not live.
+The pagination summary itself is visible but not live; `MatchCount` announces the range only when
+the page alone changed (T-038). Full structure, contrast table and the manual screen-reader
+checklist: `docs/ACCESSIBILITY.md`.
 
 **Focus rules.**
 
 - Navigation moves focus to the page `<h1>`, except a switch from `DealershipSelector`
   (`keepFocus` history state, Zod-validated), which leaves focus on the select.
-- Clear filters focuses the filter region; "View all N aging vehicles" focuses `#inventory-list`.
+- Clear filters focuses the filter region; "View all N aging vehicles" focuses the "Vehicle list"
+  `h2` (`id="inventory-list"`, `tabIndex=-1`).
 - Dialog: focus to the heading on open; Escape and Close restore focus to the trigger; if the
-  trigger is gone (the row left a needs-attention view), focus goes to `#inventory-list`.
+  trigger is gone (the row left a needs-attention view), focus goes to the "Vehicle list" `h2`.
 - Save and Refresh use `aria-disabled` while busy (not `disabled`), so keyboard focus is not
   dropped by Chromium. A save error moves focus to the alert; an invalid submit focuses the first
   invalid field (RHF `shouldFocusError`).
@@ -343,7 +346,9 @@ Pagination summary ("Showing 26-50 of 312") is visible but not live.
 **Other.** Semantic `<table>` with caption and `scope="col"`; sortable headers are `<button>`s in
 `<th aria-sort>`; KPIs are a `<dl>`; "Aging" and "Needs attention" are text badges with
 `aria-hidden` icons; rows are not clickable, each has a "View <stock no.>" button; form errors use
-`aria-invalid` + `aria-describedby`; the table scrolls inside a labelled focusable region at 768 px.
+`aria-invalid` + `aria-describedby`; the table scrolls inside a focusable `group` named by its caption (no nested region, T-038);
+the page has exactly three regions (Inventory summary, Aging stock, Vehicle list) plus a search
+landmark; one `h1`, `h2` per section, no skipped levels; the skip link moves focus to `<main>`.
 
 ### 5.6 Error, loading and empty states
 
@@ -492,18 +497,18 @@ stocked dealership has vehicles at exactly 0, 30, 31, 60, 61, 90, 91 days; `STK-
 
 ### 8.1 Test pyramid
 
-| Level              | Where                                                                                       | What it proves                                                                                                |
-| ------------------ | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Contract           | `shared/api/*.test.ts`                                                                      | Boundaries: 500/501 note after trim, blank / zero-width names, `pageSize` 100/101, `stringbool`, min > max    |
-| API unit           | `lib/dates.test.ts`, `vehicle-age.test.ts`, `*.service.test.ts`                             | 0/90/91 days, 23:30Z in London = next day, DST 2026-03-29 / 2026-10-25, leap day, future date clamp, rounding |
-| API route          | `*.routes.test.ts` via `createTestApp` + `app.inject()` + factories                         | Every endpoint 2xx parsed by the shared schema, 400/404/422, "nothing stored" row counts, read-back           |
-| DB                 | `schema.test.ts`, `connection.test.ts`, `server/test/persistence.test.ts`                   | CHECKs, triggers, file reopen with real startup + seeding, two app instances on one DB file (AC-007.2)        |
-| Parity             | `inventory.parity.test.ts` (API) + `src/mocks/*.test.ts` (MSW) over `shared/api/*.cases.ts` | MSW mock behaves like the API                                                                                 |
-| Perf               | `inventory.perf.test.ts`, isolated run (`test:perf`)                                        | 5,000 vehicles: cold < 750 ms, warm < 200 ms (measured: warm 4-6 ms, deepest makeModel page 15.5 ms)          |
-| Web component/hook | Vitest + RTL + user-event + MSW, role/label queries                                         | Four states per region, URL state, form validation, focus, announcements, EN and VI                           |
-| Storybook          | 24 `*.stories.tsx`, a11y addon `test: 'error'`                                              | Visual states; full feature coverage is T-040 (open)                                                          |
-| Real browser       | Headless Chrome via `puppeteer-core` (scratchpad only, not a repo dependency) + axe-core    | Layout, real Intl, real focus, end-to-end against the real API                                                |
-| E2E                | Playwright (T-042)                                                                          | **Not done**                                                                                                  |
+| Level              | Where                                                                                        | What it proves                                                                                                                                             |
+| ------------------ | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contract           | `shared/api/*.test.ts`                                                                       | Boundaries: 500/501 note after trim, blank / zero-width names, `pageSize` 100/101, `stringbool`, min > max                                                 |
+| API unit           | `lib/dates.test.ts`, `vehicle-age.test.ts`, `*.service.test.ts`                              | 0/90/91 days, 23:30Z in London = next day, DST 2026-03-29 / 2026-10-25, leap day, future date clamp, rounding                                              |
+| API route          | `*.routes.test.ts` via `createTestApp` + `app.inject()` + factories                          | Every endpoint 2xx parsed by the shared schema, 400/404/422, "nothing stored" row counts, read-back                                                        |
+| DB                 | `schema.test.ts`, `connection.test.ts`, `server/test/persistence.test.ts`                    | CHECKs, triggers, file reopen with real startup + seeding, two app instances on one DB file (AC-007.2)                                                     |
+| Parity             | `inventory.parity.test.ts` (API) + `src/mocks/*.test.ts` (MSW) over `shared/api/*.cases.ts`  | MSW mock behaves like the API                                                                                                                              |
+| Perf               | `inventory.perf.test.ts`, isolated run (`test:perf`)                                         | 5,000 vehicles: cold < 750 ms, warm < 200 ms (measured: warm 4-6 ms, deepest makeModel page 15.5 ms)                                                       |
+| Web component/hook | Vitest + RTL + user-event + MSW, role/label queries                                          | Four states per region, URL state, form validation, focus, announcements, EN and VI                                                                        |
+| Storybook          | All components and feature states, `play` interactions; a11y addon `test: 'error'`           | 109 stories run in real Chrome: all plays pass, 0 axe violations (T-040)                                                                                   |
+| Real browser       | Headless Chrome via `puppeteer-core` (scratchpad only, not a repo dependency) + axe-core     | Layout, real Intl, real focus, end-to-end against the real API                                                                                             |
+| E2E                | Playwright (`e2e/`, 12 tests, real API + seed, `APP_TODAY` pinned, fresh temp DB, own ports) | Journey (filter → log → reload), dealership switch, non-aging, language, axe EN/VI/drawer, keyboard, AC-005.4 viewport at 1280x800, lost-filter race guard |
 
 Current numbers (from `npm run validate` runs recorded in the collaboration log):
 
@@ -512,11 +517,12 @@ Current numbers (from `npm run validate` runs recorded in the collaboration log)
 | Phase 4 fix round, as committed in `6e9822c` | 615       | 369       | 7    | Log, Phase 4 fix-round outcome |
 | Phase 5 working tree, before review fixes    | 674       | 369       | 7    | Log, Phase 5 (passed twice)    |
 | Phase 5 after the review fix round           | 699       | 369       | 7    | 3 green runs (agent 2, me 1)   |
+| Phase 6 (a11y, states matrix, race fix)      | 762       | 369       | 7    | `validate` green; E2E 12/12    |
 
 Coverage thresholds 80/80/80/70 (lines/functions/statements/branches) are enforced in both
 workspaces by `npm run validate`; the last explicitly recorded percentages were 99.6% (web) and
 98.9% (API) statements at the Phase 1 fix round. CI (`.github/workflows/ci.yml`) runs `validate`,
-`build` and `build-storybook`.
+`build`, `build-storybook`, then the Playwright suite on bundled Chromium (report uploaded).
 
 ### 8.2 Parity tables: why they exist
 
@@ -545,9 +551,10 @@ bottom at y=239 of 800, AC-005.4), `vehicle-drawer-log-action-en.png`,
 
 ### 8.4 Accessibility
 
-jsx-a11y lint (0 warnings allowed), Storybook a11y addon as a gate, axe on the live page, keyboard
-and focus checks in Chrome. Not yet done: a real screen reader (VoiceOver/NVDA) pass and the full
-keyboard walkthrough (T-038).
+jsx-a11y lint, axe in Playwright on the real app (EN, VI, drawer open: 0 violations), the a11y addon
+on all 109 stories in Chrome, automated landmark/heading/Tab-order tests, and a contrast test on the
+real colour tokens (4 failing pairs found and fixed). Details and the manual checklist:
+`docs/ACCESSIBILITY.md`. Not done: a real screen-reader (VoiceOver/NVDA) pass.
 
 ### 8.5 Security
 
@@ -563,19 +570,20 @@ keyboard walkthrough (T-038).
 
 ### 8.6 Current status and known issues
 
-Phase 5 (T-034..T-037) is done. The end-of-phase review returned **CHANGES REQUESTED**; the fix
-round was paused by the stakeholder to write this document, then resumed and completed. Status of
-the findings and remaining caveats:
+Phases 5 and 6 are done. Status of the findings raised along the way and the remaining caveats:
 
-| Severity | Finding                                                                                                                                                                                                                                                                                       | Source           |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| Fixed    | MAJOR: the sort was re-announced after Back then Forward and after a dealership round trip (AC-011.3). The agent believed it fixed; its test only covered Back after a filter change. Now a one-shot request keyed by dealership; verified in Chrome (Back → Forward leaves the status empty) | code-reviewer    |
-| Fixed    | MAJOR: a search-draft race (since Phase 2) could drop keystrokes under load ("stk-10" became "stk10"). Missed by 5 earlier reviews. `useSearchDraft` now remembers its own pending commits; deterministic manual-clock tests; verified in Chrome at 6x CPU throttling ("stk-104" intact)      | code-reviewer    |
-| Fixed    | The 60 s poll is now exercised with fake timers (nothing before 60 s; summary, aging, list and open vehicle detail once; typed input and URL kept), plus a hidden-tab test (no poll, one refetch on focus). Both tests fail with a 30 s interval or background polling                        | test-engineer    |
-| Gap      | AC-005.4 (KPIs above the fold at 1280x800) has no automated check; screenshots only, moved to T-042                                                                                                                                                                                           | test-engineer    |
-| Caveat   | `MatchCount` silences polls by remounting the live region, which relies on common screen-reader behaviour; not tested with VoiceOver/NVDA                                                                                                                                                     | Phase 2 review   |
-| Queued   | Nested `#inventory-list` region and whether paging should be announced (T-038)                                                                                                                                                                                                                | Phase 2/3 review |
-| Accepted | The MSW mock keeps the last value of a repeated query key (the API returns 400)                                                                                                                                                                                                               | Phase 1 review   |
+| Severity | Finding                                                                                                                                                                                                                                                                                       | Source             |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| Fixed    | MAJOR: the sort was re-announced after Back then Forward and after a dealership round trip (AC-011.3). The agent believed it fixed; its test only covered Back after a filter change. Now a one-shot request keyed by dealership; verified in Chrome (Back → Forward leaves the status empty) | code-reviewer      |
+| Fixed    | MAJOR: a search-draft race (since Phase 2) could drop keystrokes under load ("stk-10" became "stk10"). Missed by 5 earlier reviews. `useSearchDraft` now remembers its own pending commits; deterministic manual-clock tests; verified in Chrome at 6x CPU throttling ("stk-104" intact)      | code-reviewer      |
+| Fixed    | The 60 s poll is now exercised with fake timers (nothing before 60 s; summary, aging, list and open vehicle detail once; typed input and URL kept), plus a hidden-tab test (no poll, one refetch on focus). Both tests fail with a 30 s interval or background polling                        | test-engineer      |
+| Fixed    | AC-005.4 is now automated: `e2e/viewport.spec.ts` asserts the KPI region bottom ≤ 800 px and all 5 cards in view at 1280x800, EN and VI (measured y=239)                                                                                                                                      | test-engineer      |
+| Caveat   | `MatchCount` silences polls by remounting the live region, which relies on common screen-reader behaviour; not tested with VoiceOver/NVDA                                                                                                                                                     | Phase 2 review     |
+| Fixed    | Nested region removed (list is a `section` with an `h2`; table scroll is a `group`); paging announced once by `MatchCount` (T-038)                                                                                                                                                            | Phase 2/3 review   |
+| Fixed    | E2E found that two quick filter changes dropped the first one: writers now build on the router's current location (TA-33). Guarded by `e2e/quick-filters.spec.ts`, verified by mutation                                                                                                       | Playwright (T-042) |
+| Fixed    | Found in T-038/T-039: facets raised an alert on a failed background refresh; the drawer body was not keyboard-scrollable; 4 colour pairs below AA                                                                                                                                             | web agent          |
+| Caveat   | TA-33 relies on React Router's `UNSAFE_DataRouterContext`; re-run the unit and E2E guards on any React Router upgrade                                                                                                                                                                         | orchestrator       |
+| Accepted | The MSW mock keeps the last value of a repeated query key (the API returns 400)                                                                                                                                                                                                               | Phase 1 review     |
 
 ## 9. Scalability & future improvements
 
@@ -589,17 +597,13 @@ the findings and remaining caveats:
 | Team size                | The contract in `shared/` and the parity tables let web and API teams work independently; consider OpenAPI publishing from Swagger for external consumers                                                                                              |
 | Observability            | Structured action logs (the TRD's planned `{ actionId, vehicleId, status }` info log), metrics on request latency, client error reporting instead of `console.error`                                                                                   |
 
-**Open Phase 6 work (in planned order):**
+**Remaining work:**
 
-1. T-038 accessibility pass: full keyboard walkthrough, screen-reader check of the announcer model,
-   768 px, contrast, nested region.
-2. T-039 states and error matrix per region (MSW 500 / empty / slow; York with the real API).
-3. T-040 Storybook stories with `play` interactions for all feature states.
-4. T-041 README: run guide written (demo walkthrough, `APP_TODAY`, reset, troubleshooting); re-sync
-   once Phase 5 is committed.
-5. T-042 (optional) Playwright: filter → log action → reload; dealership switch resets filters;
-   an automated 1280x800 viewport check for AC-005.4.
-6. T-043/T-044 (optional) CSV export with formula-injection protection.
+1. A real screen-reader pass (VoiceOver + Safari, NVDA + Firefox/Chrome) using the checklist in
+   `docs/ACCESSIBILITY.md`, especially that 60 s polls stay silent.
+2. A Vietnamese copy review by a native-speaker product owner.
+3. Optional US-013 CSV export (T-043/T-044) with formula-injection protection.
+4. Cross-browser E2E (Firefox, WebKit) in CI.
 
 ## 10. AI-assisted development process
 
@@ -692,7 +696,9 @@ flowchart LR
 | 13  | A name of only U+200B accepted; character counter in UTF-16 units (300 emoji → "600 / 500" but saved); `disabled` Save dropped keyboard focus                                                                                                                                                                                                                                         | code-reviewer (Phase 4)                                                                                                                                  | TA-30 `isBlankText` shared by API, form, mock; code-point counter; `aria-disabled`                                                                                                                                                     |
 | 14  | Sort announcement "fixed" for Back, but still re-announced on Back→Forward                                                                                                                                                                                                                                                                                                            | code-reviewer (Phase 5)                                                                                                                                  | Fixed in the Phase 5 fix round: a one-shot announcement request keyed by dealership                                                                                                                                                    |
 | 15  | Search draft race present since Phase 2, dropping keystrokes under load                                                                                                                                                                                                                                                                                                               | code-reviewer from a loaded `validate` log                                                                                                               | Fixed in the Phase 5 fix round: a one-shot announcement request keyed by dealership                                                                                                                                                    |
-| 16  | **Orchestrator's mistakes:** (a) brief asked for a centred dialog, contradicting ADR-006; (b) TRD note overstated a mutation result ("caught on both sides"); (c) parallel reviewer + tester wrote to the same `coverage/` dir; (d) an unformatted TRD edit silently stopped `validate` at the format check; (e) T-012 ticked before it was logged; (f) error message hard-coded "90" | (a) frontend agent flagged the conflict; (b) test-engineer; (c) both agents' `validate` failed; (d) re-reading output; (e) code-reviewer; (f) own review | (a) ADR kept, brief was wrong; (b) note corrected, `serverOnly` rows; (c) private `--coverage.reportsDirectory` for parallel agents; (d) formatted, check now part of the routine; (e) logged; (f) interpolates `AGING_THRESHOLD_DAYS` |
+| 16  | URL writers built the next URL from the last render's query: two quick filter changes dropped the first (`?ageBucket=over-90`, no make). Present since Phase 2, invisible to jsdom tests                                                                                                                                                                                              | Playwright E2E against the real app (T-042)                                                                                                              | Writers read the router's current location (TA-33); red-first unit tests; dedicated E2E guard                                                                                                                                          |
+| 17  | Orchestrator's first E2E "regression guard" (removing the helper's wait) still passed with the bug reintroduced: Playwright's gap between two actions lets React re-render on an idle machine                                                                                                                                                                                         | Orchestrator's own mutation check                                                                                                                        | New `quick-filters.spec.ts` dispatches both changes in one browser task; fails with the mutation (`?ageBucket=over-90`), passes with the fix                                                                                           |
+| 18  | **Orchestrator's mistakes:** (a) brief asked for a centred dialog, contradicting ADR-006; (b) TRD note overstated a mutation result ("caught on both sides"); (c) parallel reviewer + tester wrote to the same `coverage/` dir; (d) an unformatted TRD edit silently stopped `validate` at the format check; (e) T-012 ticked before it was logged; (f) error message hard-coded "90" | (a) frontend agent flagged the conflict; (b) test-engineer; (c) both agents' `validate` failed; (d) re-reading output; (e) code-reviewer; (f) own review | (a) ADR kept, brief was wrong; (b) note corrected, `serverOnly` rows; (c) private `--coverage.reportsDirectory` for parallel agents; (d) formatted, check now part of the routine; (e) logged; (f) interpolates `AGING_THRESHOLD_DAYS` |
 
 ### 10.5 Human (stakeholder) decisions
 
@@ -716,8 +722,7 @@ own fixture).
   product owner.
 - **Screen readers:** no VoiceOver or NVDA pass. The announcer model (remounted live regions for
   silent polls) relies on common behaviour.
-- **AC-005.4** (KPIs visible at 1280x800) is evidenced by screenshots only; no automated viewport
-  test until T-042.
+- **AC-005.4** is automated in Chrome only (Playwright); other browsers are not run.
 - **The 60 s poll** is tested with fake timers, but a timer-driven poll was not observed in a real
   browser.
 - **jsdom dialog** is a stub; real focus behaviour was checked in Chrome only, not in Safari or

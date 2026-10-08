@@ -72,7 +72,9 @@ export function MakeModelFilters({
           </Select>
         )}
       </Field>
-      {isError && (
+      {/* Only when there are no options to show: a failed background refresh (Refresh button)
+          keeps the loaded options silently instead of raising an alert (T-039, §5.6). */}
+      {isError && !data && (
         <div role="alert" className="flex items-center gap-2 self-end text-sm text-red-700">
           <span>{t('inventory.filters.facets.error')}</span>
           <Button variant="secondary" size="sm" onClick={() => void refetch()}>

@@ -2,7 +2,12 @@ import preview from '#.storybook/preview';
 import { delay, http, HttpResponse } from 'msw';
 import { expect, fn } from 'storybook/test';
 import { apiUrl } from '@/lib/http';
+import { fixtureDealerships } from '@/mocks/fixtures';
 import { AgingSection } from './AgingSection';
+import { VehicleTable } from './VehicleTable';
+
+const [birmingham] = fixtureDealerships;
+if (!birmingham) throw new Error('fixture dealerships missing');
 
 const vehiclesUrl = apiUrl('/dealerships/:dealershipId/vehicles');
 
@@ -29,6 +34,26 @@ export const Selectable = meta.story({
   play: async ({ canvas, userEvent, args }) => {
     await userEvent.click(await canvas.findByRole('button', { name: /STK-1001/ }));
     await expect(args.onSelectVehicle).toHaveBeenCalledWith(1);
+  },
+});
+
+/**
+ * With the list: "View all 19 aging vehicles" sets Aging only on the list and moves focus to the
+ * list's heading (AC-004.3, TA-29).
+ */
+export const ViewAll = meta.story({
+  render: (args) => (
+    <div className="space-y-6">
+      <AgingSection {...args} />
+      <VehicleTable dealership={birmingham} />
+    </div>
+  ),
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(
+      await canvas.findByRole('button', { name: 'View all 19 aging vehicles' }),
+    );
+    await expect(canvas.getByRole('heading', { level: 2, name: 'Vehicle list' })).toHaveFocus();
+    await expect(await canvas.findByText('Showing 1-19 of 19')).toBeVisible();
   },
 });
 

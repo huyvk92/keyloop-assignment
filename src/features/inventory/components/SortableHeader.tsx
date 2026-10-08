@@ -31,7 +31,7 @@ function SortIcon({ state }: { state: SortOrder | 'none' }) {
       aria-hidden="true"
       viewBox="0 0 12 12"
       fill="currentColor"
-      className={cn('size-3 shrink-0', state === 'none' && 'text-slate-400')}
+      className={cn('size-3 shrink-0', state === 'none' && 'text-slate-500')}
     >
       {state !== 'desc' && <path d="M6 1.5 9 5H3z" />}
       {state !== 'asc' && <path d="M6 10.5 3 7h6z" />}

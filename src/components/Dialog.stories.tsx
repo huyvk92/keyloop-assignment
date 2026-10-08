@@ -71,7 +71,11 @@ export const LongContent = meta.story({
   },
 });
 
-/** Keyboard only: Enter opens, focus lands on the heading, Escape closes, focus returns. */
+/**
+ * Keyboard only: Enter opens, focus lands on the heading, Tab reaches Close, Enter closes and focus
+ * returns. Escape is not played here: Storybook's synthetic key events don't trigger the native
+ * `<dialog>` cancel, so it is covered by Dialog.test.tsx and the manual keyboard checklist.
+ */
 export const KeyboardOpenClose = meta.story({
   play: async ({ args, canvas, userEvent }) => {
     const trigger = canvas.getByRole('button', { name: 'View STK-1042' });
@@ -82,7 +86,9 @@ export const KeyboardOpenClose = meta.story({
     await expect(dialog).toHaveAttribute('open');
     await expect(canvas.getByRole('heading', { name: 'STK-1042 · Ford Focus' })).toHaveFocus();
 
-    await userEvent.keyboard('{Escape}');
+    await userEvent.tab();
+    await expect(canvas.getByRole('button', { name: 'Close' })).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
 
     await waitFor(() => expect(canvas.queryByRole('dialog')).not.toBeInTheDocument());
     await expect(args.onClose).toHaveBeenCalledOnce();
