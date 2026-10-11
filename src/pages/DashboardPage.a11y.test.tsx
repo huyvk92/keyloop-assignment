@@ -140,6 +140,8 @@ describe('Dashboard accessibility structure (T-038)', () => {
       screen.getByRole('textbox', { name: 'Minimum days' }),
       screen.getByRole('textbox', { name: 'Maximum days' }),
       screen.getByRole('button', { name: 'Apply range' }),
+      // After the match count it acts on (T-044).
+      screen.getByRole('button', { name: 'Export CSV' }),
       // The scroll container (keyboard scrolling at 768 px), then the sortable headers.
       within(list).getByRole('group', { name: 'Vehicles in stock at Leeds' }),
       within(list).getByRole('button', { name: 'Make' }),

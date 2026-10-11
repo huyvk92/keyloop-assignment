@@ -4,8 +4,8 @@
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Brief   | `docs/ASSIGNMENT.md` (Keyloop, domain "Supply")                                                                                           |
 | Sources | `docs/PRD.md` v0.3, `docs/TRD.md` (ADR-001..009, TA-01..32), `docs/AI_COLLABORATION_LOG.md`, code on branch `feature/inventory-dashboard` |
-| Code    | Phases 1-6 on `feature/inventory-dashboard` (see §1.2); optional CSV export not done                                                      |
-| Updated | 2026-10-08                                                                                                                                |
+| Code    | Phases 1-6 and the CSV export (US-013) on `feature/inventory-dashboard` (see §1.2)                                                        |
+| Updated | 2026-10-11                                                                                                                                |
 
 This document describes the code that exists, not the plan. Where the TRD and the code differ,
 the code is described and the difference is listed in §6.5.
@@ -64,17 +64,17 @@ Full requirements: `docs/PRD.md` (15 stories, BR-01..BR-19, NFR-01..NFR-10).
 
 ### 2.2 Story status
 
-| Story                                                  | Priority | Status                                |
-| ------------------------------------------------------ | -------- | ------------------------------------- |
-| US-001..US-007 list, filter, aging, KPIs, log, persist | Must     | Done and committed                    |
-| US-015 English / Vietnamese                            | Must     | Done and committed                    |
-| US-008 switch dealership                               | Should   | Done and committed (pulled forward)   |
-| US-009 refresh / last updated                          | Should   | Done (Phase 5)                        |
-| US-010 needs attention                                 | Should   | Done (API Phase 2/3, UI Phase 5)      |
-| US-011 sort                                            | Should   | Done (API Phase 2, header UI Phase 5) |
-| US-012 remember "Logged by"                            | Should   | Done (Phase 5)                        |
-| US-013 CSV export                                      | Could    | Not done (optional T-043/T-044)       |
-| US-014 configurable threshold                          | Won't    | Not done by decision                  |
+| Story                                                  | Priority | Status                                                  |
+| ------------------------------------------------------ | -------- | ------------------------------------------------------- |
+| US-001..US-007 list, filter, aging, KPIs, log, persist | Must     | Done and committed                                      |
+| US-015 English / Vietnamese                            | Must     | Done and committed                                      |
+| US-008 switch dealership                               | Should   | Done and committed (pulled forward)                     |
+| US-009 refresh / last updated                          | Should   | Done (Phase 5)                                          |
+| US-010 needs attention                                 | Should   | Done (API Phase 2/3, UI Phase 5)                        |
+| US-011 sort                                            | Should   | Done (API Phase 2, header UI Phase 5)                   |
+| US-012 remember "Logged by"                            | Should   | Done (Phase 5)                                          |
+| US-013 CSV export                                      | Could    | Done: client-side from the list API (PRD v0.4, ADR-010) |
+| US-014 configurable threshold                          | Won't    | Not done by decision                                    |
 
 ### 2.3 Non-functional requirements (summary)
 
@@ -476,6 +476,14 @@ stocked dealership has vehicles at exactly 0, 30, 31, 60, 61, 90, 91 days; `STK-
 | 008 | Dealership in the path, filters in search params                               | `?dealershipId=`; Zustand/localStorage                                  | Bookmarkable; dealership switch resets filters for free                                      | Invalid ids go through the 404 path                                                                  |
 | 009 | `i18next` + `react-i18next`, bundled EN/VI, typed keys, no detector            | react-intl; Lingui; hand-rolled context; language detector              | Light, typed, plural/interpolation support; English default per A-16                         | Main chunk 130 kB gzip (ADR's 10-15 kB estimate not measured separately)                             |
 
+**ADR-010 (added with PRD v0.4): CSV export generated in the browser.** At the stakeholder's
+request the API only returns data: the Export button fetches every page of the existing list
+endpoint with the current filters and sort (`pageSize=100`, 4 at a time, all-or-nothing), parses
+each page with the shared schema, and builds an RFC 4180 file (UTF-8 BOM, CRLF, formula-injection
+guard on text cells) that is downloaded through a Blob URL. Alternative rejected: a server
+`text/csv` endpoint. Trade-off: up to 50 requests for 5,000 vehicles, and a row whose filter
+membership changes mid-export may be duplicated or missed (TA-34).
+
 ### 7.1 Deliberately not done
 
 | Not done                              | Why                                                                                                              |
@@ -602,8 +610,7 @@ Phases 5 and 6 are done. Status of the findings raised along the way and the rem
 1. A real screen-reader pass (VoiceOver + Safari, NVDA + Firefox/Chrome) using the checklist in
    `docs/ACCESSIBILITY.md`, especially that 60 s polls stay silent.
 2. A Vietnamese copy review by a native-speaker product owner.
-3. Optional US-013 CSV export (T-043/T-044) with formula-injection protection.
-4. Cross-browser E2E (Firefox, WebKit) in CI.
+3. Cross-browser E2E (Firefox, WebKit) in CI.
 
 ## 10. AI-assisted development process
 

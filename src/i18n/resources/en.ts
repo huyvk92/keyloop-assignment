@@ -227,6 +227,37 @@ export const en = {
       button: 'Refresh',
       refreshing: 'Refreshing…',
     },
+    /** CSV export of the filtered list (US-013, ADR-010). Data in the file is never translated. */
+    export: {
+      button: 'Export CSV',
+      exporting: 'Exporting…',
+      /** Shown with the mapped error message; no file is downloaded (AC-013.2). */
+      error: "Couldn't export the vehicles.",
+      /** Accessible description of the unavailable button when nothing matches. */
+      empty: 'There are no vehicles to export.',
+      yes: 'Yes',
+      no: 'No',
+      /** CSV column headings (TA-34), in the file's column order. */
+      columns: {
+        stockNumber: 'Stock no.',
+        vin: 'VIN',
+        make: 'Make',
+        model: 'Model',
+        year: 'Year',
+        trim: 'Trim',
+        colour: 'Colour',
+        mileage: 'Mileage (mi)',
+        listPrice: 'List price',
+        currency: 'Currency',
+        stockInDate: 'Stock-in date',
+        daysInStock: 'Days in stock',
+        aging: 'Aging',
+        needsAttention: 'Needs attention',
+        currentAction: 'Current action',
+        loggedBy: 'Logged by',
+        loggedAt: 'Logged at (UTC)',
+      },
+    },
     pagination: {
       label: 'Pagination',
       summary: 'Showing {{from}}-{{to}} of {{total}}',

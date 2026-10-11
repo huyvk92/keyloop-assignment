@@ -7,6 +7,7 @@ import { PageSection } from '@/components/PageSection';
 import { DealershipSelector, useDealership } from '@/features/dealerships';
 import {
   AgingSection,
+  ExportButton,
   FilterBar,
   KpiCards,
   LIST_HEADING_ID,
@@ -86,7 +87,13 @@ export function DashboardPage() {
       <KpiCards dealershipId={dealership.id} />
       <AgingSection dealershipId={dealership.id} onSelectVehicle={selectVehicle} />
       {/* Keyed by dealership: a switch drops the search draft and any pending debounce (TA-10). */}
-      <FilterBar key={dealership.id} dealershipId={dealership.id} />
+      {/* The export lives in the filter bar, so the same key aborts a running export on a
+          dealership switch (BR-04, T-044). */}
+      <FilterBar
+        key={dealership.id}
+        dealershipId={dealership.id}
+        actions={<ExportButton dealership={dealership} />}
+      />
       {/* Keyed by dealership too (prefixed: sibling keys must differ from FilterBar's), so a sort
           chosen at one dealership is never announced after a round trip through another
           (AC-011.3). */}

@@ -15,6 +15,7 @@ export { AgeRangeFilter } from './components/AgeRangeFilter';
 export { AgingSection } from './components/AgingSection';
 export { AgingBadge } from './components/AgingBadge';
 export { AttentionBadge } from './components/AttentionBadge';
+export { ExportButton } from './components/ExportButton';
 export { FilterBar } from './components/FilterBar';
 export { KpiCards } from './components/KpiCards';
 export { Pagination } from './components/Pagination';

@@ -2,6 +2,7 @@ import {
   formatDate,
   formatDateTime,
   formatTime,
+  toMajorUnits,
   formatInteger,
   formatMileage,
   formatMoney,
@@ -162,5 +163,22 @@ describe('formatPercent (BR-15, TA-21)', () => {
     expect(formatPercent(37.5, 'vi-VN')).toBe(
       new Intl.NumberFormat('vi-VN', { style: 'percent', maximumFractionDigits: 1 }).format(0.375),
     );
+  });
+});
+
+describe('toMajorUnits (CSV export, TA-34)', () => {
+  it.each([
+    [2599000, 'GBP', '25990.00'],
+    [2599050, 'GBP', '25990.50'],
+    [5, 'GBP', '0.05'],
+    [0, 'GBP', '0.00'],
+    [25990, 'JPY', '25990'],
+    [1234567, 'BHD', '1234.567'],
+  ])('%i %s gives %s', (minor, currency, expected) => {
+    expect(toMajorUnits(minor, currency)).toBe(expected);
+  });
+
+  it.each([-1, 1.5, Number.NaN])('rejects %d', (minor) => {
+    expect(() => toMajorUnits(minor, 'GBP')).toThrow(RangeError);
   });
 });

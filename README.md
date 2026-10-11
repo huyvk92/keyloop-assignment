@@ -171,8 +171,10 @@ in the collaboration log.
 - **Done:** requirements 1-3; English/Vietnamese UI; dealership dropdown; KPIs including "Needs
   attention"; aging section; sortable columns; Refresh with "Last updated"; remembered "Logged by"
   name; accessibility pass ([docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md)); Playwright E2E.
-- **Not done:** a manual screen-reader pass (checklist ready), the optional CSV export, and a
-  configurable aging threshold (out of scope, fixed at 90 days).
+- **Also done:** CSV export of the current filtered view (all pages), built in the browser
+  from the list API.
+- **Not done:** a manual screen-reader pass (checklist ready) and a configurable aging
+  threshold (out of scope, fixed at 90 days).
 
 ## Troubleshooting
 

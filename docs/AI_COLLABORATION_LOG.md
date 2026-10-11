@@ -654,3 +654,39 @@ Scaffold (`/init-react-app`) -> TDD implementation (`/implement-trd`) -> Review 
   scripts only waited for HTTP 200 from `/api/health`. From now on they also assert the expected
   `today` in the health response. A clean rerun gave `today: 2026-10-07` and 86 aging. The layout
   result was unaffected.
+
+### 2026-10-11 · CSV export, client-side (PRD v0.4, T-043/T-044 redefined)
+
+- **Trigger**: The user could not find a CSV export. It had never been built: US-013 was Could,
+  and the docs listed it as "not done". I said so plainly and apologised that my earlier
+  "remaining (optional)" wording could be misread.
+- **Human decision**: The API returns data and the frontend builds the CSV, with no server CSV
+  endpoint.
+- **Spec first (mine)**:
+  - PRD v0.4: AC-013.2..4 (busy state with no double export and no partial file on error;
+    Vietnamese headings with untranslated data; formula-injection guard) and A-17.
+  - TRD: ADR-010 (reuse the list API, all pages with `pageSize=100`, bounded concurrency,
+    all-or-nothing) and TA-34 (columns, formats, file name, accepted mid-export drift).
+  - T-043/T-044 were redefined from a server endpoint to client-side work.
+- **AI output**:
+  - An RFC 4180 writer (BOM, CRLF, a `'` prefix for text starting with `= + - @`, tab or CR,
+    numbers never guarded).
+  - A paged fetch: 4 at a time, kept in order, abortable, and rejected whole on any failure.
+  - An ExportButton next to the match count: `aria-disabled` while exporting, focus kept, an
+    alert on error, disabled with an explanation when there are 0 matches.
+  - 3 E2E tests on the real API, including 360 rows sorted by price across page boundaries with
+    no duplicates.
+  - Web 824 tests, E2E 15/15. The agent also fixed the Tab-order test that the new button broke.
+- **My verification (real Chrome, real API)**:
+  - The new health guard caught a **second** stale dev server on :3001 (`today` was 2026-10-11
+    instead of the pinned 2026-10-07). The guard did its job, so I re-ran clean.
+  - The download was `inventory-birmingham-central-motors-2026-10-07.csv`, with the BOM, CRLF and
+    exactly 5 Ford over-90 rows. Prices were `13395.00` with a GBP column; dates were ISO; vehicles
+    with no action had empty logged-by and logged-at cells.
+  - The VI export had Vietnamese headings, "Có" and "Dự kiến giảm giá", with the data unchanged.
+  - The button sits on the same row as "5 xe khớp với bộ lọc", so the layout above the fold is
+    unchanged.
+- **Docs**:
+  - TRD traceability and ticks updated; ACCESSIBILITY Tab order now includes Export CSV.
+  - The SDD has ADR-010 and status "done"; the README status and the requirement 1 row were
+    updated.

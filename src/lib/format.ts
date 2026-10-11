@@ -37,7 +37,7 @@ function moneyFormatter(
 /** Number of minor-unit digits for a currency (GBP 2, JPY 0), per ISO 4217 data in Intl. */
 const minorUnitDigitsCache = new Map<string, number>();
 
-function minorUnitDigits(currency: string): number {
+export function minorUnitDigits(currency: string): number {
   let digits = minorUnitDigitsCache.get(currency);
   if (digits === undefined) {
     digits =
@@ -62,6 +62,22 @@ export function formatMoney(
   const factor = 10 ** digits;
   const isWhole = amountMinor % factor === 0;
   return moneyFormatter(currency, isWhole ? 0 : digits, locale).format(amountMinor / factor);
+}
+
+/**
+ * An integer amount in minor units as a plain decimal in major units with `.` and the currency's
+ * full minor digits, no grouping or symbol: `toMajorUnits(2599000, 'GBP')` gives "25990.00",
+ * JPY gives "25990". For machine-readable output (the CSV export, TA-34), not for display.
+ * Integer string arithmetic, so no floating-point rounding.
+ */
+export function toMajorUnits(amountMinor: number, currency: string): string {
+  if (!Number.isSafeInteger(amountMinor) || amountMinor < 0) {
+    throw new RangeError(`Invalid minor amount: ${amountMinor}`);
+  }
+  const digits = minorUnitDigits(currency);
+  if (digits === 0) return String(amountMinor);
+  const text = String(amountMinor).padStart(digits + 1, '0');
+  return `${text.slice(0, -digits)}.${text.slice(-digits)}`;
 }
 
 const dateParts = new Intl.DateTimeFormat(PARTS_LOCALE, {

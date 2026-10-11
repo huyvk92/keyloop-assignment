@@ -78,7 +78,7 @@ VoiceOver + Safari (macOS) and NVDA + Firefox or Chrome (Windows).
 4. **Skip link:** the first Tab shows "Skip to content" with a visible ring; Enter moves to main,
    and the next Tab reaches Refresh.
 5. **Tab order:** skip link → brand → Language → Refresh → Dealership → View all + aging items →
-   Search → Make → Model → Days in stock → the two checkboxes → Min, Max, Apply → table group →
+   Search → Make → Model → Days in stock → the two checkboxes → Min, Max, Apply → Export CSV → table group →
    sort buttons → row "View" buttons → Previous, Next. Every stop has a visible focus ring.
 6. **KPIs:** each value is read with its term. For York, the average reads "Not available", not
    "dash".

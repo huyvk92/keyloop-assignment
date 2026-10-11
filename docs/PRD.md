@@ -2,9 +2,9 @@
 
 | Field        | Value              |
 | ------------ | ------------------ |
-| Version      | 0.3                |
+| Version      | 0.4                |
 | Status       | Draft              |
-| Last updated | 2026-10-07         |
+| Last updated | 2026-10-11         |
 | Source       | docs/ASSIGNMENT.md |
 
 ## 1. Problem statement
@@ -244,7 +244,10 @@ As a Dealership Manager, I want my name pre-filled when I log actions, so that l
 
 As a Dealership Manager, I want to export the filtered list, so that I can share it in meetings.
 
-- **AC-013.1**: Given filters are applied, when the manager exports, then a CSV file containing exactly the filtered vehicles (all pages) with their age, aging flag and current action is downloaded.
+- **AC-013.1**: Given filters are applied, when the manager exports, then a CSV file containing exactly the filtered vehicles (all pages, in the current sort order) with their age, aging flag and current action is downloaded.
+- **AC-013.2**: Given an export is running, when the manager waits, then the Export button shows a busy state and cannot start a second export; given the export fails, then an error message is shown and no partial file is downloaded.
+- **AC-013.3**: Given Vietnamese is selected, when the manager exports, then column headings and action status labels are in Vietnamese, vehicle data is exactly as stored (BR-19), and the file opens in spreadsheet software with Vietnamese characters intact.
+- **AC-013.4**: Given a stored value starts with `=`, `+`, `-` or `@` (e.g. a note or name), when exported, then it is written so spreadsheet software does not execute it as a formula (NFR-03).
 
 ### US-015: Use the dashboard in English or Vietnamese · Priority: Must (added v0.3)
 
@@ -322,6 +325,7 @@ As a Dealership Manager, I want to change the aging threshold, so that it matche
 | A-14 | What does "real-time" mean?                                                              | Fresh on load, automatic refresh every 60 s (consistent with NFR-05), manual refresh, own changes reflected immediately. No push/streaming.                                                                                                                                                                              | Brief defines no event source; polling-level freshness meets the "overview" need.                                              |
 | A-15 | Should actions for non-aging vehicles be possible?                                       | No new actions; existing history stays visible (e.g. if data is corrected).                                                                                                                                                                                                                                              | Literal reading of the brief ("for each aging vehicle") while not hiding recorded decisions.                                   |
 | A-16 | Which languages, which default, and how is the choice kept? (stakeholder answered, v0.3) | English and Vietnamese only. The dashboard always opens in English on first use, regardless of browser language; a Vietnamese choice is remembered per browser (no account, so no server-side preference). Translating stored data (makes, models, notes, names) is out of scope.                                        | Stakeholder decision; a per-browser preference fits the no-authentication assumption A-01.                                     |
+| A-17 | How is the CSV produced? (stakeholder answered, v0.4)                                    | The API returns data only (the existing list endpoint); the browser builds and downloads the CSV. The export contains the dealership's vehicles matching the current filters and sort, all pages. Dates are ISO `YYYY-MM-DD`, prices are numbers in major units with a currency column, UTF-8 with a byte-order mark.    | Stakeholder decision; no server change and the same validated contract as the list.                                            |
 
 ## 8. Out of scope
 
@@ -335,7 +339,7 @@ As a Dealership Manager, I want to change the aging threshold, so that it matche
 - Configurable aging threshold (US-014, Won't)
 - Sold / historical vehicles and trend reporting over time
 - Mobile phone layouts below 768 px, offline use, languages other than English and Vietnamese, translation of stored data
-- CSV export is optional (US-013, Could) and only delivered if time permits
+- CSV export (US-013, Could) was added in v0.4 at the stakeholder's request; it is generated in the browser from the existing list API (A-17)
 
 ## 9. Open questions
 

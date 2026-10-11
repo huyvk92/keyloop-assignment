@@ -1,5 +1,5 @@
 import { AGE_BUCKETS, type AgeBucket } from '@shared/api/vehicles';
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox } from '@/components/Checkbox';
 import { Field } from '@/components/Field';
@@ -12,7 +12,11 @@ import { MakeModelFilters } from './MakeModelFilters';
 import { MatchCount } from './MatchCount';
 import { SearchFilter } from './SearchFilter';
 
-type Props = { dealershipId: number };
+type Props = {
+  dealershipId: number;
+  /** Controls placed after the match count, e.g. the CSV export (T-044). */
+  actions?: ReactNode;
+};
 
 const isAgeBucket = (value: string): value is AgeBucket =>
   (AGE_BUCKETS as readonly string[]).includes(value);
@@ -25,9 +29,10 @@ const isAgeBucket = (value: string): value is AgeBucket =>
  * Compact so the page stays short (AC-005.4): at 1280 px, search, make, model, age bucket and the
  * two checkboxes share one row, and the custom range and the match count a second one. Narrower
  * screens wrap the same controls (the two checkboxes move together); nothing scrolls
- * horizontally at 768 px.
+ * horizontally at 768 px. `actions` (the export button) sit after the match count in the second
+ * row, so they act on the result the count describes without adding a row.
  */
-export function FilterBar({ dealershipId }: Props) {
+export function FilterBar({ dealershipId, actions }: Props) {
   const { t } = useTranslation();
   const { query, hasFilters, setFilter, setFilters, setSearch } =
     useInventorySearchParams(dealershipId);
@@ -115,7 +120,10 @@ export function FilterBar({ dealershipId }: Props) {
           // Both keys always, so an emptied input removes its bound.
           onApply={({ minAge, maxAge }) => setFilters({ minAge, maxAge })}
         />
-        <MatchCount dealershipId={dealershipId} query={query} hasFilters={hasFilters} />
+        <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+          <MatchCount dealershipId={dealershipId} query={query} hasFilters={hasFilters} />
+          {actions}
+        </div>
       </div>
     </div>
   );
