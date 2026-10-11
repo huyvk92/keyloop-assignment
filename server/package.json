@@ -9,7 +9,8 @@
     "seed": "tsx --env-file-if-exists=.env src/db/seed-cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "test:perf": "vitest run --config vitest.perf.config.ts"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",

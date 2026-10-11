@@ -13,7 +13,7 @@
 | Concern | Choice | Why |
 | ------- | ------ | --- |
 | Build | Vite | |
-| UI | React 18 + TypeScript (strict) | |
+| UI | React 19 + TypeScript (strict) | |
 | Routing | React Router | |
 | Styling | Tailwind CSS v4 | |
 | Server state | TanStack Query | |

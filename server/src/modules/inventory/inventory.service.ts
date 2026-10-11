@@ -1,0 +1,190 @@
+import type {
+  FacetsResponse,
+  InventorySummary,
+  SortKey,
+  SortOrder,
+  VehicleDetail,
+  VehicleListItem,
+  VehicleListQuery,
+  VehicleListResponse,
+} from '@shared/api/vehicles';
+import type { Clock } from '../../lib/clock';
+import { localDate } from '../../lib/dates';
+import { NotFoundError } from '../../lib/errors';
+import type { ActionsRepository } from '../actions/actions.repository';
+import type { DealershipsRepository } from '../dealerships/dealerships.repository';
+import type {
+  InventoryRepository,
+  MakeModelRow,
+  SummaryTotals,
+  VehicleRow,
+} from './inventory.repository';
+import { ageFilterToDateRange, agingCutoffDate, ageInDays, isAging } from './vehicle-age';
+
+type Deps = {
+  dealerships: DealershipsRepository;
+  inventory: InventoryRepository;
+  actions: ActionsRepository;
+  clock: Clock;
+};
+
+/** Order used when the query omits `order` (TA-06): oldest first, cheapest first, A-Z. */
+const DEFAULT_ORDER: Record<SortKey, SortOrder> = { age: 'desc', price: 'asc', makeModel: 'asc' };
+
+/** Derived fields are computed on every request, never stored (BR-01..BR-03, BR-14, BR-16). */
+function toListItem(row: VehicleRow, today: string): VehicleListItem {
+  const daysInStock = ageInDays(row.stockInDate, today);
+  const aging = isAging(daysInStock);
+  const currentAction =
+    row.actionStatus && row.actionLoggedBy && row.actionLoggedAt
+      ? { status: row.actionStatus, loggedBy: row.actionLoggedBy, loggedAt: row.actionLoggedAt }
+      : null;
+  return {
+    id: row.id,
+    dealershipId: row.dealershipId,
+    vin: row.vin,
+    stockNumber: row.stockNumber,
+    make: row.make,
+    model: row.model,
+    modelYear: row.modelYear,
+    trim: row.trim,
+    colour: row.colour,
+    mileage: row.mileage,
+    listPriceMinor: row.listPriceMinor,
+    stockInDate: row.stockInDate,
+    daysInStock,
+    isAging: aging,
+    needsAttention: aging && currentAction === null,
+    currentAction,
+  };
+}
+
+/** Groups make/model rows (sorted by make, then model) into facets; equal makes are adjacent (BR-06). */
+function toFacets(rows: MakeModelRow[]): FacetsResponse {
+  const makes: FacetsResponse['makes'] = [];
+  for (const { make, model } of rows) {
+    const last = makes.at(-1);
+    if (last?.make === make) last.models.push(model);
+    else makes.push({ make, models: [model] });
+  }
+  return { makes };
+}
+
+/**
+ * KPI rounding (TA-21): percent to 1 dp, average to a whole day; Math.round is half up for these
+ * non-negative values. Multiply before dividing: (count / total) * 1000 picks up binary float
+ * error (201 / 400 gave 502.4999... and so 50.2 instead of 50.3). An empty stock gives 0 % and a null average (BR-15, AC-005.3).
+ */
+function toSummary(totals: SummaryTotals, asOfDate: string): InventorySummary {
+  const { totalVehicles, agingCount, totalDaysInStock, needsAttentionCount } = totals;
+  const empty = totalVehicles === 0;
+  return {
+    asOfDate,
+    totalVehicles,
+    agingCount,
+    agingPercent: empty ? 0 : Math.round((agingCount * 1000) / totalVehicles) / 10,
+    averageDaysInStock: empty ? null : Math.round(totalDaysInStock / totalVehicles),
+    needsAttentionCount,
+  };
+}
+
+export function createInventoryService({ dealerships, inventory, actions, clock }: Deps) {
+  function requireDealership(dealershipId: number) {
+    const dealership = dealerships.findById(dealershipId);
+    if (!dealership) throw new NotFoundError(`Dealership ${dealershipId} not found`);
+    return dealership;
+  }
+
+  /**
+   * One vehicle with exactly the list's derived fields (age, aging, current action, needs
+   * attention), as of its dealership's local today (BR-01..BR-03, BR-14, BR-16).
+   */
+  function requireVehicle(vehicleId: number) {
+    const row = inventory.findById(vehicleId);
+    if (!row) throw new NotFoundError(`Vehicle ${vehicleId} not found`);
+    // vehicles.dealership_id is a NOT NULL foreign key, so the dealership always exists.
+    const dealership = requireDealership(row.dealershipId);
+    const today = localDate(clock.now(), dealership.timeZone);
+    return { vehicle: toListItem(row, today), dealership };
+  }
+
+  return {
+    /** The list item of one vehicle; 404 when unknown. Used by the actions service (BR-09). */
+    getVehicle(vehicleId: number): VehicleListItem {
+      return requireVehicle(vehicleId).vehicle;
+    },
+
+    /** List item + display context + full history newest first (AC-004.4, BR-13, BR-14). */
+    getVehicleDetail(vehicleId: number): VehicleDetail {
+      const { vehicle, dealership } = requireVehicle(vehicleId);
+      return {
+        ...vehicle,
+        currency: dealership.currency,
+        timeZone: dealership.timeZone,
+        actions: actions.listByVehicle(vehicleId),
+      };
+    },
+
+    /** Make/model filter options from the dealership's own stock (BR-04, BR-06). */
+    getFacets(dealershipId: number): FacetsResponse {
+      requireDealership(dealershipId);
+      return toFacets(inventory.listMakeModels(dealershipId));
+    },
+
+    /** KPIs over the whole in-stock inventory, as of the dealership-local today (BR-15, BR-16). */
+    getSummary(dealershipId: number): InventorySummary {
+      const dealership = requireDealership(dealershipId);
+      const today = localDate(clock.now(), dealership.timeZone);
+      const totals = inventory.summaryTotals({
+        dealershipId,
+        today,
+        agingCutoff: agingCutoffDate(today),
+      });
+      return toSummary(totals, today);
+    },
+
+    listVehicles(dealershipId: number, query: VehicleListQuery): VehicleListResponse {
+      const dealership = requireDealership(dealershipId);
+      const today = localDate(clock.now(), dealership.timeZone);
+      // "Needs attention" = aging AND no action (BR-16); false flags apply no restriction (BR-05)
+      const needsAttention = query.needsAttention === true;
+      const stockIn = ageFilterToDateRange(
+        {
+          ageBucket: query.ageBucket,
+          minAge: query.minAge,
+          maxAge: query.maxAge,
+          agingOnly: query.agingOnly === true || needsAttention,
+        },
+        today,
+      );
+      // An empty age intersection is a valid filter with no matches, not an error (TA-07)
+      if (stockIn === null) {
+        return { items: [], total: 0, page: query.page, pageSize: query.pageSize };
+      }
+
+      const { rows, total } = inventory.listPage({
+        dealershipId,
+        filter: {
+          make: query.make,
+          model: query.model,
+          stockInFrom: stockIn.from,
+          stockInTo: stockIn.to,
+          search: query.q,
+          withoutAction: needsAttention,
+        },
+        sort: query.sort,
+        order: query.order ?? DEFAULT_ORDER[query.sort],
+        limit: query.pageSize,
+        offset: (query.page - 1) * query.pageSize,
+      });
+      return {
+        items: rows.map((row) => toListItem(row, today)),
+        total,
+        page: query.page,
+        pageSize: query.pageSize,
+      };
+    },
+  };
+}
+
+export type InventoryService = ReturnType<typeof createInventoryService>;

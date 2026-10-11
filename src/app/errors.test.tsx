@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { ErrorBoundary } from 'react-error-boundary';
 import { ErrorFallback } from '@/app/ErrorFallback';
 import { RouteError } from '@/app/RouteError';
-import { renderRoutes } from '@/test/render';
+import { i18n } from '@/i18n';
+import { preloadRouteModules, renderRoutes } from '@/test/render';
 
 describe('ErrorFallback', () => {
   it('shows an alert and recovers when "Try again" is clicked', async () => {
@@ -29,6 +30,8 @@ describe('ErrorFallback', () => {
 });
 
 describe('RouteError', () => {
+  beforeAll(preloadRouteModules);
+
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -62,5 +65,16 @@ describe('RouteError', () => {
       'Something went wrong while loading this page.',
     );
     expect(screen.getByRole('link', { name: 'Back to home' })).toHaveAttribute('href', '/');
+  });
+
+  it('is translated when Vietnamese is selected', async () => {
+    await i18n.changeLanguage('vi');
+    function Broken(): never {
+      throw new Error('boom');
+    }
+    renderRoutes([{ path: '/', errorElement: <RouteError />, element: <Broken /> }]);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Đã xảy ra lỗi khi tải trang này.');
+    expect(screen.getByRole('link', { name: 'Về trang chủ' })).toHaveAttribute('href', '/');
   });
 });

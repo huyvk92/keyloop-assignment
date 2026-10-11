@@ -37,3 +37,9 @@ storybook-static
 server/.env
 server/data
 server/coverage
+
+# Playwright (T-042)
+test-results
+playwright-report
+blob-report
+playwright/.cache

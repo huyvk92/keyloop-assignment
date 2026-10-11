@@ -1,4 +1,5 @@
 import type { Clock } from '../lib/clock';
+import { inventorySeeder } from '../modules/inventory/inventory.seed';
 import type { Db } from './connection';
 
 export type Seeder = {
@@ -9,7 +10,7 @@ export type Seeder = {
 };
 
 /** Sample-data seeders, run in order on startup when their data is missing. */
-export const seeders: Seeder[] = [];
+export const seeders: Seeder[] = [inventorySeeder];
 
 /** Run every seeder whose data is missing, each in a transaction. Returns the names run. */
 export function seedIfEmpty(db: Db, clock: Clock, list: Seeder[] = seeders): string[] {

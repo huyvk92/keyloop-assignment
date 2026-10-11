@@ -3,11 +3,13 @@ import { buildApp } from '../src/app';
 import { openDatabase } from '../src/db/connection';
 import { migrate } from '../src/db/migrate';
 import { seedIfEmpty, type Seeder } from '../src/db/seed';
-import { fixedClock } from '../src/lib/clock';
+import { fixedClock, type Clock } from '../src/lib/clock';
 
 type Options = {
   /** Pinned "today" (YYYY-MM-DD) for deterministic date rules. */
   today?: string;
+  /** A specific clock (e.g. a late-evening instant); overrides `today`. */
+  clock?: Clock;
   /** Seeders to run; defaults to none so each test controls its own data. */
   seeders?: Seeder[];
   /** Register extra routes before the app is ready (e.g. to exercise error handling). */
@@ -15,10 +17,14 @@ type Options = {
 };
 
 /** A fully wired app on a fresh in-memory database. Call `close()` in afterEach. */
-export async function createTestApp({ today = '2026-10-07', seeders = [], setup }: Options = {}) {
+export async function createTestApp({
+  today = '2026-10-07',
+  clock = fixedClock(today),
+  seeders = [],
+  setup,
+}: Options = {}) {
   const db = openDatabase(':memory:');
   migrate(db);
-  const clock = fixedClock(today);
   seedIfEmpty(db, clock, seeders);
 
   const app = await buildApp(

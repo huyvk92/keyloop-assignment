@@ -20,6 +20,24 @@ function getString(value: unknown, key: string): string | undefined {
   return typeof field === 'string' ? field : undefined;
 }
 
+/**
+ * Fastify's content-type parser errors (`FST_ERR_CTP_*`): malformed JSON, an empty JSON body, a
+ * Content-Length mismatch, a body over the size limit, or an unsupported media type.
+ *
+ * Decision: all of them are answered 400 VALIDATION_ERROR, including the 415 for an unsupported
+ * content type. The documented contract (TRD §4.2) lists 400 VALIDATION_ERROR for any invalid
+ * request and declares no 413/415, the web client and the MSW handlers only know
+ * VALIDATION_ERROR, and our one client (the SPA) always sends JSON, so a separate 415 would have
+ * no consumer. `details` is an array like the Zod case, so clients can treat both alike.
+ */
+function isBodyParseError(error: unknown, statusCode: number): error is Error {
+  return (
+    error instanceof Error &&
+    statusCode < 500 &&
+    (getString(error, 'code') ?? '').startsWith('FST_ERR_CTP_')
+  );
+}
+
 /** Uniform error responses: every non-2xx body matches ApiErrorSchema. */
 export function registerErrorHandler(app: FastifyInstance) {
   app.setErrorHandler((error, request, reply) => {
@@ -37,6 +55,13 @@ export function registerErrorHandler(app: FastifyInstance) {
     }
 
     const statusCode = getNumber(error, 'statusCode') ?? 500;
+    if (isBodyParseError(error, statusCode)) {
+      return reply
+        .code(400)
+        .send(
+          errorBody('VALIDATION_ERROR', 'Request validation failed', [{ message: error.message }]),
+        );
+    }
     if (statusCode < 500 && error instanceof Error) {
       const code = getString(error, 'code') ?? 'BAD_REQUEST';
       return reply.code(statusCode).send(errorBody(code, error.message));

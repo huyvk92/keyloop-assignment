@@ -1,15 +1,18 @@
 import { render, screen } from '@testing-library/react';
 import { App } from '@/app/App';
 import { routes } from '@/app/router';
-import { renderRoutes } from '@/test/render';
+import { preloadRouteModules, renderRoutes } from '@/test/render';
 
 describe('App', () => {
-  it('boots with providers and renders the home page', async () => {
+  beforeAll(preloadRouteModules);
+
+  it('boots with providers and opens the first dealership dashboard', async () => {
     render(<App />);
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Welcome' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Birmingham' })).toBeVisible();
     expect(screen.getByRole('main')).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Inventory Dashboard' })).toHaveAttribute('href', '/');
   });
 
   it('renders the not-found page for unknown routes', async () => {

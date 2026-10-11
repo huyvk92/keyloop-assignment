@@ -1,5 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+// Initialise i18n first so the first render is already in the stored language (TA-25).
+import '@/i18n';
 import { App } from '@/app/App';
 import { env } from '@/lib/env';
 import './index.css';

@@ -21,6 +21,9 @@ function registerTestRoutes(app: FastifyInstance) {
       'Actions can only be logged for aging vehicles',
     );
   });
+  typed.get('/api/test/teapot', async () => {
+    throw Object.assign(new Error('I am a teapot'), { statusCode: 418, code: 'FST_ERR_TEAPOT' });
+  });
   typed.get('/api/test/crash', async () => {
     throw new Error('secret internal detail');
   });
@@ -87,15 +90,30 @@ describe('error handler', () => {
     expect(ApiErrorSchema.parse(response.json()).error.code).toBe('NOT_FOUND');
   });
 
-  it('passes through 4xx errors raised by Fastify itself', async () => {
+  it.each([
+    ['malformed JSON', 'application/json', '{not json'],
+    ['an empty JSON body', 'application/json', ''],
+    ['an unsupported content type', 'application/xml', '<note/>'],
+  ])('maps a body-parse failure (%s) to 400 VALIDATION_ERROR', async (_label, type, payload) => {
     const response = await ctx.app.inject({
       method: 'POST',
       url: '/api/test/validate',
-      headers: { 'content-type': 'application/json' },
-      payload: '{not json',
+      headers: { 'content-type': type },
+      payload,
     });
 
     expect(response.statusCode).toBe(400);
-    expect(ApiErrorSchema.safeParse(response.json()).success).toBe(true);
+    const body = ApiErrorSchema.parse(response.json());
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(body.error.details).toEqual([{ message: expect.any(String) }]);
+  });
+
+  it('passes other 4xx framework errors through with their own status and code', async () => {
+    const response = await ctx.app.inject({ method: 'GET', url: '/api/test/teapot' });
+
+    expect(response.statusCode).toBe(418);
+    expect(response.json()).toEqual({
+      error: { code: 'FST_ERR_TEAPOT', message: 'I am a teapot' },
+    });
   });
 });

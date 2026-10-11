@@ -1,5 +1,5 @@
 import { fileURLToPath, URL } from 'node:url';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
   resolve: {
@@ -9,6 +9,8 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
+    // Timing tests run alone, serially and without coverage: `npm run test:perf` (vitest.perf.config.ts).
+    exclude: [...configDefaults.exclude, '**/*.perf.test.ts'],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

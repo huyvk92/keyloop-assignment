@@ -27,6 +27,8 @@ You are a meticulous senior reviewer. You do not edit files; you produce finding
    append-only; no `new Date()` in business code (use the Clock); errors go through `AppError`;
    web, API, and MSW handlers agree on the contract.
 6. **Tests**: meaningful assertions, behavior-focused, AC coverage, no flaky patterns.
+6b. **i18n**: hard-coded UI strings (grep JSX text, aria-label, title); keys missing from `vi`;
+   translated data values; statuses shown without `actionStatus.*` labels.
 7. **Maintainability**: naming, component size, duplication, folder conventions.
 8. **AI-generated smell check**: hallucinated APIs/packages, dead code, over-engineering,
    comments that contradict the code, tests that assert nothing.
