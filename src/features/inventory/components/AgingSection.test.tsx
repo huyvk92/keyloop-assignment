@@ -127,6 +127,23 @@ describe('AgingSection', () => {
     expect(within(withOtherAction).queryByText('Needs attention')).not.toBeInTheDocument();
   });
 
+  it('keeps the full make and model of a long name for screen readers and as a hover title', async () => {
+    const longName = buildVehicle({
+      id: 10,
+      stockNumber: 'STK-0010',
+      make: 'Land Rover',
+      model: 'Range Rover Evoque',
+      daysInStock: 120,
+    });
+    mockAging(() => HttpResponse.json(buildVehiclePage([longName], { pageSize: 10 })));
+    renderSection();
+
+    const list = await screen.findByRole('list', { name: 'Aging vehicles, oldest first' });
+    // Shown on one line with an ellipsis (CSS only): the text itself is never cut.
+    const name = within(list).getByText('Land Rover Range Rover Evoque');
+    expect(name).toHaveAttribute('title', 'Land Rover Range Rover Evoque');
+  });
+
   it('pluralises the View all label for a single aging vehicle', async () => {
     mockAging(() => HttpResponse.json(buildVehiclePage(threeAging.slice(0, 1), { pageSize: 10 })));
     renderSection();

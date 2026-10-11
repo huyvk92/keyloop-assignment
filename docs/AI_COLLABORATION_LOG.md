@@ -635,3 +635,22 @@ Scaffold (`/init-react-app`) -> TDD implementation (`/implement-trd`) -> Review 
   - SDD §1.2, §5.5, §8, §9 and §10.4 updated; README status and the `npm run e2e` command added;
     T-038..T-042 ticked.
   - CSV export (Could) remains out, as future work.
+
+### 2026-10-11 · aging list: long names on one line (stakeholder UI request)
+
+- **Request**: In "Aging stock", long names such as "Land Rover Discovery Sport" should end with
+  "…" instead of wrapping.
+- **Change (mine, small enough not to delegate)**: The make/model cell in `AgingList.tsx` uses
+  `truncate` (single line with an ellipsis) plus `title` with the full name for hover. The
+  clipping is CSS only, so screen readers still read the full name. A test asserts the full text
+  and the `title`.
+- **Validation**:
+  - The aging and page tests passed (82), as did lint and typecheck.
+  - In real Chrome at 1280 px, EN and VI, all 3 long names were truncated to 1 line ("Land Rover
+    Discovery …", "Land Rover Range Rov…"), and rows stayed 33-35 px tall.
+- **Own mistake caught**: The verification screenshot showed "View all 91" and "401 days" instead
+  of the pinned 86 and 400. The run's log showed `EADDRINUSE 127.0.0.1:3001`: a leftover API from
+  an earlier run, without `APP_TODAY`, still held the port, and Vite proxied to it. My check
+  scripts only waited for HTTP 200 from `/api/health`. From now on they also assert the expected
+  `today` in the health response. A clean rerun gave `today: 2026-10-07` and 86 aging. The layout
+  result was unaffected.

@@ -26,10 +26,16 @@ export function AgingList({ vehicles, onSelectVehicle }: Props) {
   return (
     <ol aria-label={t('inventory.aging.listLabel')} className="gap-x-6 lg:columns-2">
       {vehicles.map((v) => {
+        const name = `${v.make} ${v.model}`;
         const content = (
           <>
             <span className="w-20 shrink-0 font-medium tabular-nums">{v.stockNumber}</span>
-            <span className="min-w-0 flex-1">{`${v.make} ${v.model}`}</span>
+            {/* One line with an ellipsis so long names ("Land Rover Range Rover Evoque") keep rows
+                the same height; the clipping is visual only (screen readers get the full text) and
+                `title` shows the full name on hover. */}
+            <span className="min-w-0 flex-1 truncate" title={name}>
+              {name}
+            </span>
             <span className="shrink-0 text-right tabular-nums">
               {t('inventory.aging.days', { count: v.daysInStock, days: integer(v.daysInStock) })}
             </span>
